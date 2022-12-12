@@ -19,6 +19,7 @@ define l- = e- mu-
 define vl = ve vm vt
 define vl~ = ve~ vm~ vt~
 generate p p > w- > mu- vm~ zd, zd > e+ e-
+# generate p p > w- > mu- vm~ zd
 output Generation
 # output TMPOUTPUT
 ! cp TOPDIR/cards/param_card.dat Generation/bin/internal/ufomodel/param_card.dat
@@ -29,4 +30,6 @@ TOPDIR/cards/run_card.dat
 set nevents TMPNEVENTS
 set mzd TMPMZD
 set mnm TMPMND
+set wzd auto
+set wnm auto
 0
