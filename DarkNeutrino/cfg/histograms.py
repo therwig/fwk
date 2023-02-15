@@ -5,7 +5,7 @@ from HistHelper import HistHelper
 def getHists(pfxs):
     h = HistHelper()
     for pfx in pfxs:
-        h.book(pfx+'_mt',';m(nu,e^{+},e^{-}) [GeV];',40,0,4)
+        h.book(pfx+'_mt',';m_{T}(nu,e^{+},e^{-}) [GeV];',40,0,120)
         h.book(pfx+'_mee',';m(e^{+},e^{-}) [GeV];',40,0,4)
         h.book(pfx+'_meeS',';m(e^{+},e^{-}) [GeV];',40,0,4)
         h.book(pfx+'_meeAdHoc',';m(e^{+},e^{-}) [GeV];',40,0,4)

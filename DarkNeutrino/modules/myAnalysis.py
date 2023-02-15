@@ -79,9 +79,10 @@ class myAnalysis(Module):
         if nu==None: print('missed the neutrino')
         met = nu.pt
 
-        # TODO
-        # add in mT(e,e,nu) calculation
+        # adding in the mT(e,e,nu) calculation
         mT = (el1S+el2S+nu.p4()).Mt()
+        # TODO add in dPhi(ll,MET)
+        dPhiLepMet = 0 #...
         
         # smear
         meeAdHoc = self.r.Gaus(mee, 0.010 + 0.060 * mee) # 10 MeV + 60 MeV * (mee/GeV)

@@ -1,15 +1,22 @@
-import sys, os
+import sys, os, argparse
 sys.argv.append('-b-')
 import ROOT
 ROOT.gROOT.SetBatch(True)
 sys.argv.remove('-b-')
 from cfg.histograms import getHists, GetHNames
 from cfg.cuts import cuts
-from cfg.samples import xsecs, refUm4, refEps, refAd, sig_pairs, sig_tags
+from cfg.samples import xsecs, refUm4, refEps, refAd, sig_pairs, sig_tags, sortByND, sortByZD
 from plotUtils import *
 from numpy import sqrt
 from array import array
 hnames = GetHNames()
+
+parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+parser.add_argument("--plotDir", default='plots', help="Directory in which to save plots")
+parser.add_argument("--lumi", default=150., help="Target luminosity [in 1/fb]")
+parser.add_argument("--adhocSigRescale", default=1., help="Rescale signal yields, for illustration")
+parser.add_argument("--dumpHists", action="store_true", default=False, help="Dump plots of all histograms")
+args = parser.parse_args()
 
 sig_files = {p: ROOT.TFile("histograms/outS_{}.root".format(sig_tags[p])) for p in sig_pairs}
 bkg_file = ROOT.TFile('histograms/outB1M.root','read')
@@ -19,25 +26,21 @@ for cn in cuts:
     for hname in hnames:
         for pt in sig_pairs:
             h[("mZD{}_mND{}".format(*pt), cn, hname)] = sig_files[pt].Get(cn+'_'+hname)
-            # print(("mZD{}_mND{}".format(*pt), cn, hname), h[("mZD{}_mND{}".format(*pt), cn, hname)])
         h[("b", cn, hname)] = bkg_file.Get(cn+'_'+hname)
-        # print(("b", cn, hname), h[("b", cn, hname)])
 
 # plotting helpers
-procTags = ['b'] + [sig_tags[p] for p in sig_pairs] #['mZD{}_mND{}'.format(*pt) for pt in sig_pairs]
+procTags = ['b'] + [sig_tags[p] for p in sig_pairs]
 procLabs = ['Bkgd'] + ['m_{{ZD}},m_{{ND}}=({},{}) GeV'.format(*pt) for pt in sig_pairs]
 legsty=['f']+['l' for x in sig_pairs]
 
-
+###
 ### preliminary: dump signal and background plot shape overlays
-runDumps=0
-if runDumps:
-    pdir='plots/dumps/raw/'
+if args.dumpHists:
+    pdir=args.plotDir+'/dumps/raw/'
     for hname in hnames:
         doLogX = ('logx' in hname)
         for cutname in cuts:
             # fix the cut, plot for all processes
-            # print( [h[(t,cutname,hname)] for t in procTags] )
             plot(cutname+'_'+hname, [h[(t,cutname,hname)] for t in procTags],
                  labs=procLabs, fcolz=[18], legstyle=legsty,
                  ytitle='event fraction', dopt='hist', logx=doLogX,
@@ -48,20 +51,21 @@ if runDumps:
                  ytitle='event fraction', dopt='hist', logx=doLogX,
                  pdir=pdir+'/byProcess') 
 
+###
 ### Now produce distributions for a common set of signal parameters, run conditions
 ### Reference constants used for this sample production
-lumi = 150 # in 1/fb
-adhocSigRescale=1 #e-6 to rescale parameters, for example
 for cutname in cuts:
     for hname in hnames:
         b = h[('b',cutname,hname)]
-        b.Scale(lumi*xsecs['b']*1e3) # 1e3 b/c xs is in pb
+        b.Scale(args.lumi*xsecs['b']*1e3) # 1e3 b/c xs is in pb
         for sig in procTags[1:]:
             s = h[(sig,cutname,hname)]
-            s.Scale(lumi*xsecs[sig]*1e3*adhocSigRescale) # 1e3 b/c xs is in pb
-### Plotting
-if runDumps:
-    pdir='plots/dumps/yields/'
+            s.Scale(args.lumi*xsecs[sig]*1e3*args.adhocSigRescale) # 1e3 b/c xs is in pb
+
+###
+### Optionally dump a second set of histograms, now properly normalized
+if args.dumpHists:
+    pdir=args.plotDir+'/dumps/yields/'
     for hname in hnames:
         doLogX = ('logx' in hname)
         for cutname in cuts:
@@ -75,8 +79,8 @@ if runDumps:
                  ytitle='events', dopt='hist', logx=doLogX,
                  pdir=pdir+'/byProcess')
 
-
-### Now produce the S/B plots and so on
+###
+### Now produce the S/B histograms for "limit-setting"
 hname='meeS_logx1'
 for cutname in cuts:
     b = h[('b',cutname,hname)]
@@ -93,18 +97,11 @@ for cutname in cuts:
         h[('sb',sig,cutname,hname)] = sb
         h[('srb',sig,cutname,hname)] = srb
         
-pdir='plots/limits/'
-for cutname in cuts:
-    plot(cutname+'_sb_'+hname, [h[('sb',t,cutname,hname)] for t in procTags[1:]],
-         labs=procLabs[1:], 
-         ytitle='S/B', dopt='hist', logx=1,
-         pdir=pdir)
-    plot(cutname+'_srb_'+hname, [h[('srb',t,cutname,hname)] for t in procTags[1:]],
-         labs=procLabs[1:], 
-         ytitle='S/sqrt(B)', dopt='hist', logx=1,
-         pdir=pdir)
+###
+### Plot various limit inputs
+pdir=args.plotDir+'/limitInputs/'
 
-# find limits by rescaling
+# Setup exlcusion graphs for fixed ND and ZD masses
 procTags_mZD0p03 = [sig_tags[p] for p in sig_pairs if p[0]=='0p03']; #procTags_mZD0p03.sort()
 procTags_mND10 = [sig_tags[p] for p in sig_pairs if p[1]=='10']; #procTags_mND10.sort()
 gsets={'mZD0p03':{},
@@ -112,8 +109,50 @@ gsets={'mZD0p03':{},
        }
 gs1={}
 gs2={}
+
+
+### S/B histograms
 for cutname in cuts:
-    srbTarget=2
+    plot('sb_'+cutname+'_'+hname, [h[('sb',t,cutname,hname)] for t in procTags[1:]],
+         labs=procLabs[1:], 
+         ytitle='S/B', dopt='hist', logx=1,
+         pdir=pdir)
+    plot('srb_'+cutname+'_'+hname, [h[('srb',t,cutname,hname)] for t in procTags[1:]],
+         labs=procLabs[1:], 
+         ytitle='S/sqrt(B)', dopt='hist', logx=1,
+         pdir=pdir)
+    
+### event yields per point
+for cutname in cuts:
+    for scanName, sigTags in [('mZD0p03',procTags_mZD0p03),('mND10',procTags_mND10)]:
+        xvals, yvals = [],[]
+        for t in sigTags:
+            s = h[(t,cutname,hname)]
+            mZd = float(t.split('_')[0][3:].replace('p','.'))
+            mNd = float(t.split('_')[1][3:].replace('p','.'))
+            xvals.append(mZd if 'mND' in scanName else mNd)
+            yvals.append(s.Integral())
+        g = ROOT.TGraph(len(xvals),array('d',xvals), array('d',yvals))
+        sortGraph(g)
+        g.SetName(cutname+'_'+hname+'_evtYields_'+('zd' if 'mND' in scanName else 'nd'))
+        gsets[scanName][g.GetName()] = g
+plotGraphs('yields_zd', [gsets['mND10'][x] for x in gsets['mND10']],
+           xtitle='m(Z_{d}) [MeV]', ytitle='Events',
+           legcoors=(0.7,0.6,0.88,0.9),
+           xlims=None, legcols=1,
+           logy=True, logx=True, colz=None, styz=None, dopt='AL*', pdir=pdir)
+plotGraphs('yields_nd', [gsets['mZD0p03'][x] for x in gsets['mZD0p03']],
+           xtitle='m(N_{d}) [MeV]', ytitle='Events',
+           legcoors=(0.7,0.6,0.88,0.9),
+           xlims=None, legcols=1,
+           logy=True, logx=True, colz=None, styz=None, dopt='AL*', pdir=pdir)
+    
+
+# Find limits, rescaling signal to achieve S/sqrt(B)=2
+gsets['mZD0p03_chi2'] = {}
+gsets['mND10_chi2'] = {}
+for cutname in cuts:
+    srbTarget=2 # "two sigma exclusion"
     for scanName, sigTags in [('mZD0p03',procTags_mZD0p03),('mND10',procTags_mND10)]:
         xvals, yvals = [],[]
         for t in sigTags:
@@ -122,93 +161,55 @@ for cutname in cuts:
             mNd = float(t.split('_')[1][3:].replace('p','.'))
             refReach = _srb.GetMaximum()
             maxReach = (srbTarget/refReach * refUm4*refUm4 if refReach else 1.)
-            # print (mZd, refUm4, refReach, )
             xvals.append(mZd if 'mND' in scanName else mNd)
             yvals.append(maxReach)
         g = ROOT.TGraph(len(xvals),array('d',xvals), array('d',yvals))
         g.SetName(cutname+'_'+hname+'_reach_'+('zd' if 'mND' in scanName else 'nd'))
-        # if 'yields_pz5' in g.GetName() and 'lx2' in g.GetName():
         gsets[scanName][g.GetName()] = g
 
-    # for t in procTags[1:]:
-    #     _srb = h[('srb',t,cutname,hname)]
-    #     mZd = float(t.split('_')[0][3:].replace('p','.'))
-    #     mNd = float(t.split('_')[1][3:].replace('p','.'))
-    #     # exit(0)
-    #     # mZd = 1 #float(_srb.GetName().split('_'))
-    #     refReach = _srb.GetMaximum()
-    #     maxReach = (srbTarget/refReach * refUm4*refUm4 if refReach else 1.)
-    #     # print (mZd, refUm4, refReach, )
-    #     xvals.append(mZd)
-    #     xvals2.append(mNd)
-    #     yvals.append(maxReach)
-  
-    # g = ROOT.TGraph(len(xvals),array('d',xvals), array('d',yvals))
-    # g.SetName(cutname+'_'+hname+'_reach_zd')
-    # # if 'yields_pz5' in g.GetName() and 'lx2' in g.GetName():
-    # gs1[g.GetName()] = g
-    # g = ROOT.TGraph(len(xvals),array('d',xvals2), array('d',yvals))
-    # g.SetName(cutname+'_'+hname+'_reach_nd')
-    # # if 'yields_pz5' in g.GetName() and 'lx2' in g.GetName():
-    # gs2[g.GetName()] = g
 eps2Min, eps2Max = 1e-7, 1e-4
-    
-plotGraphs('reach_zd', [gsets['mND10'][x] for x in gsets['mND10']],
+pdir=args.plotDir+'/limits'
+plotGraphs('srb_reach_zd', [gsets['mND10'][x] for x in gsets['mND10']],
            xtitle='m(Z_{d}) [MeV]', ytitle='|U_{#mu 4}|^{2}',
            legcoors=(0.7,0.6,0.88,0.9),
            xlims=None, ymin=eps2Min, ymax=eps2Max, legcols=1,
-           logy=True, logx=True, colz=None, styz=None, dopt='AL*')
-plotGraphs('reach_nd', [gsets['mZD0p03'][x] for x in gsets['mZD0p03']],
+           logy=True, logx=True, colz=None, styz=None, dopt='AL*', pdir=pdir)
+plotGraphs('srb_reach_nd', [gsets['mZD0p03'][x] for x in gsets['mZD0p03']],
            xtitle='m(N_{d}) [MeV]', ytitle='|U_{#mu 4}|^{2}',
            legcoors=(0.7,0.6,0.88,0.9),
            xlims=None, ymin=eps2Min, ymax=eps2Max, legcols=1,
-           logy=True, logx=True, colz=None, styz=None, dopt='AL*')
+           logy=True, logx=True, colz=None, styz=None, dopt='AL*', pdir=pdir)
 
 ### Produce the chi2 limits directly from the yield plots
 from fitSignal import getMuSigInterval
 gsets['mZD0p03_chi2'] = {}
 gsets['mND10_chi2'] = {}
-hname='meeS_logx1'
-print( procTags_mZD0p03) 
-print( procTags_mND10) 
-# for cutname in cuts:
-#     b = h[('b',cutname,hname)]
-#     for sig in procTags[1:]:
-#         s = h[(sig,cutname,hname)]
-#         refChi2 = getMuSigInterval(s, b)
-#         print( cutname, sig, refChi2)
+hname='meeS_logx1' # histogram for signal extraction
+
 for cutname in cuts:
     nSigmaTarget=2 #TODO pass to chi2 interval fn (make configurable)
     b = h[('b',cutname,hname)]
     for scanName, sigTags in [('mZD0p03',procTags_mZD0p03),('mND10',procTags_mND10)]:
         xvals, yvals = [],[]
         for t in sigTags:
-            s = h[(sig,cutname,hname)]
-            sigStrengthExcl = getMuSigInterval(s, b)
+            s = h[(t,cutname,hname)]
+            sigStrengthExcl = getMuSigInterval(s, b, flatBkgSyst=1, maxChi2=nSigmaTarget*nSigmaTarget)
             mZd = float(t.split('_')[0][3:].replace('p','.'))
             mNd = float(t.split('_')[1][3:].replace('p','.'))
-            # print( cutname, scanName, t, sigStrengthExcl)
-            # _srb = h[('srb',t,cutname,hname)]
-            # mZd = float(t.split('_')[0][3:].replace('p','.'))
-            # mNd = float(t.split('_')[1][3:].replace('p','.'))
-            # refReach = _srb.GetMaximum()
             maxReach = (sigStrengthExcl * refUm4*refUm4)
-            # print (mZd, refUm4, refReach, )
-            print (mZd if 'mND' in scanName else mNd, maxReach, mZd, mNd)
             xvals.append(mZd if 'mND' in scanName else mNd)
             yvals.append(maxReach)
         g = ROOT.TGraph(len(xvals),array('d',xvals), array('d',yvals))
         g.SetName(cutname+'_'+hname+'_reach_'+('zd' if 'mND' in scanName else 'nd'))
-        # if 'yields_pz5' in g.GetName() and 'lx2' in g.GetName():
         gsets[scanName][g.GetName()] = g
-plotGraphs('reach_chi2_zd', [gsets['mND10'][x] for x in gsets['mND10']],
+
+plotGraphs('chi2_reach_zd', [gsets['mND10'][x] for x in gsets['mND10']],
            xtitle='m(Z_{d}) [MeV]', ytitle='|U_{#mu 4}|^{2}',
            legcoors=(0.7,0.6,0.88,0.9),
            xlims=None, ymin=eps2Min, ymax=eps2Max, legcols=1,
-           logy=True, logx=True, colz=None, styz=None, dopt='AL*')
-plotGraphs('reach_chi2_nd', [gsets['mZD0p03'][x] for x in gsets['mZD0p03']],
+           logy=True, logx=True, colz=None, styz=None, dopt='AL*', pdir=pdir)
+plotGraphs('chi2_reach_nd', [gsets['mZD0p03'][x] for x in gsets['mZD0p03']],
            xtitle='m(N_{d}) [MeV]', ytitle='|U_{#mu 4}|^{2}',
            legcoors=(0.7,0.6,0.88,0.9),
            xlims=None, ymin=eps2Min, ymax=eps2Max, legcols=1,
-           logy=True, logx=True, colz=None, styz=None, dopt='AL*')
-
+           logy=True, logx=True, colz=None, styz=None, dopt='AL*', pdir=pdir)

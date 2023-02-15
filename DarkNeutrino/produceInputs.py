@@ -1,29 +1,49 @@
 #/usr/bin/env python3
 #import ROOT
-from EventFormat import convert
+import argparse
+from EventFormat import convert, convertHepMC
 from cfg.samples import sig_pairs, sig_tags
 
-print("Converting the signal mass points")
-for p in sig_pairs:
-    fname = "data/lhe/outS_{}.lhe.gz".format(sig_tags[p])
+parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+parser.add_argument("--signals", default=None, help="Comma-separated list of signal points to run")
+parser.add_argument("--doBackground", action="store_true", default=False, help="Convert the background")
+parser.add_argument("--hepmc", action="store_true", default=False, help="Use HepMC inputs")
+args = parser.parse_args()
+
+good_pairs = sig_pairs
+if not (args.signals is None):
+    good_pairs = [p for p in sig_pairs if sig_tags[p] in args.signals.split(',')]
+
+if len(good_pairs): print("Converting the signal mass points")
+for p in good_pairs:
+    if args.hepmc:
+        fname = "data/hepmc/outS_{}.hepmc.gz".format(sig_tags[p])
+        new_fname = fname.replace('.hepmc.gz','.root').replace('/hepmc/','/root/')
+        print( " Converting {} to {}".format(fname,new_fname) )
+        convertHepMC(fname,new_fname)
+    else:
+        fname = "data/lhe/outS_{}.lhe.gz".format(sig_tags[p])
+        new_fname = fname.replace('.lhe.gz','.root').replace('/lhe/','/root/')
+        print( " Converting {} to {}".format(fname,new_fname) )
+        convert(fname,new_fname)
+
+if args.doBackground:
+    print("Converting the W background events")
+    fname='data/lhe/outB1M.lhe.gz'
     new_fname = fname.replace('.lhe.gz','.root').replace('/lhe/','/root/')
     print( "Converting {} to {}".format(fname,new_fname) )
-    # convert(fname,new_fname)
-
-print("Converting the W background events")
-fname='data/lhe/outB1M.lhe.gz'
-new_fname = fname.replace('.lhe.gz','.root').replace('/lhe/','/root/')
-print( "Converting {} to {}".format(fname,new_fname) )
-# convert(fname,new_fname)
-
-
-print("Printing out the signal mass point cross section values (in pb)")
+    convert(fname,new_fname)
+    
+if len(good_pairs): print("Printing out the signal mass point cross section values (in pb)")
 import subprocess
-for p in sig_pairs:
+for p in good_pairs:
     fname = "data/lhe/outS_{}.lhe.gz".format(sig_tags[p])
     proc = subprocess.run(["zgrep", "Integrated", fname], capture_output=True)
     xs = proc.stdout.rstrip().split()[-1].decode()
     print( '"{}" : {},'.format(sig_tags[p],xs))
+
+
+
     
 # print (all_files)
 

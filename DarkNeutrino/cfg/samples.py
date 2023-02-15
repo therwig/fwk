@@ -1,28 +1,46 @@
 import numpy as np
-
+from collections import OrderedDict
 # reference signal coupling parameters
 refEps =  0.00016552945 # alphaEM*eps^2 = 2e-10
 refAd  = 0.25
 refUm4 = 1.0e-2
 
 # list of masses generated
-sig_pairs = [ (mzd,'10') for mzd in ['0p03','0p1','0p3','1','3'] ]
-sig_pairs+= [ ('0p03',mnd) for mnd in ['0p1','0p3','1','3'] ]
+sig_pairs = [ (mzd,'10') for mzd in ['0p002','0p003','0p01','0p03','0p1','0p3','1','3'] ]
+sig_pairs+= [ ('0p03',mnd) for mnd in ['0p07','0p1','0p3','1','3'] ]
+# sig_pairs = [ ('0p03','0p07') ] 
 # and some associated helpers
 sig_tags = {p:"mZD{}_mND{}".format(*p) for p in sig_pairs}
 def num(myStr): return float(myStr.replace('p','.'))
 sig_masses = {p: (num(p[0]),num(p[1])) for p in sig_pairs}
+
+def sortByKeyMass(aDict, keyMass):
+    massToKey = {float(k.split('_')[keyMass][3:].replace('p','.')) : k for k in aDict}
+    masses = [m for m in massToKey]
+    masses.sort()
+    toRet = OrderedDict()
+    for m in masses: toRet[massToKey[m]] = aDict[massToKey[m]]
+    return toRet
+def sortByZD(aDict): return sortByKeyMass(aDict, keyMass=0)
+def sortByND(aDict): return sortByKeyMass(aDict, keyMass=1)
+    
+    # keys = [k for k in aDict]
 
 # Currently these are printout out at the LHE-reading step and filled here by hand.
 xsecs={ # all in pb (MG5 default)
     'b': 1.4758064474251178,
     # generated according to the parameters listed above
     # based on the process "p p > w- > mu- vm~"
+    "mZD0p03_mND0p07" : 0.216237066059297,
     "mZD0p03_mND0p1" : 0.21567405402742099,
     "mZD0p03_mND0p3" : 0.21543524959280136,
     "mZD0p03_mND1" : 0.21547111240421904,
     "mZD0p03_mND3" : 0.21480848532452002,
     "mZD0p03_mND10" : 0.20945157574000003,
+
+    "mZD0p002_mND10" : 1.101714955,
+    "mZD0p003_mND10" : 0.5884025471000001,
+    "mZD0p01_mND10" : 0.23680761574999998,
     "mZD0p1_mND10" : 0.20967051814520002,
     "mZD0p3_mND10" : 0.14754557280233,
     "mZD1_mND10" : 0.14266838948370802,
