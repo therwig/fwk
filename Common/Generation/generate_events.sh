@@ -6,7 +6,9 @@
 
 ## PARSE
 PROC=b
-if [[ $1 = s ]]; then
+if [[ $1 = sZ ]]; then
+    PROC=sZ
+elif [[ $1 = s ]]; then
     PROC=s
 fi
 shift;
@@ -14,7 +16,11 @@ DIR=$1; shift;
 NEVENTS=$1; shift;
 
     
-if [[ $PROC = s ]]; then
+if [[ $PROC = sZ ]]; then
+    CARD=proc_card_mg5_sig_Zd4L.tpl;
+    MZD=$1; shift;
+    MND=$1; shift;
+elif [[ $PROC = s ]]; then
     CARD=proc_card_mg5_sig.tpl;
     MZD=$1; shift;
     MND=$1; shift;
@@ -36,7 +42,10 @@ sed -i '' 's|TMPOUTPUT|'${DIR}'|g' $DIR/proc_card_mg5.dat
 sed -i '' 's|TOPDIR|'${HERE}'|g' $DIR/proc_card_mg5.dat
 sed -i '' 's|TMPNEVENTS|'${NEVENTS}'|g' $DIR/proc_card_mg5.dat
 
-if [[ $PROC = s ]]; then
+if [[ $PROC = sZ ]]; then
+    sed -i '' 's|TMPMZD|'${MZD}'|g' $DIR/proc_card_mg5.dat
+    sed -i '' 's|TMPMND|'${MND}'|g' $DIR/proc_card_mg5.dat
+elif [[ $PROC = s ]]; then
     sed -i '' 's|TMPMZD|'${MZD}'|g' $DIR/proc_card_mg5.dat
     sed -i '' 's|TMPMND|'${MND}'|g' $DIR/proc_card_mg5.dat
 fi
