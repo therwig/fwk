@@ -1,14 +1,17 @@
+import sys, os
+sys.argv.append('-b-')
 import ROOT
+ROOT.gROOT.SetBatch(True)
+sys.argv.remove('-b-')
+
 from Analysis.eventloop import eventLoop
 from Analysis.treeReaderArrayTools import InputTree
-import sys
-
 from modules.myAnalysis import myAnalysis
+from cfg.samples import sig_pairs, sig_tags
 from cfg.histograms import getHists
 from cfg.cuts import cuts
 
-sig_mZd_mNd = [ (mzd,'10') for mzd in ['0p03','0p1','0p3','1','3'] ]
-sig_files = ["data/root/outS_mZD{}_mND{}.root".format(*p) for p in sig_mZd_mNd]
+sig_files = ["data/root/outS_{}.root".format(sig_tags[p]) for p in sig_pairs]
 all_files = sig_files + ['data/root/outB1M.root']
 
 for fname in all_files:

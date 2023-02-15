@@ -1,15 +1,29 @@
 #/usr/bin/env python3
 #import ROOT
 from EventFormat import convert
+from cfg.samples import sig_pairs, sig_tags
 
-sig_mZd_mNd = [ (mzd,'10') for mzd in ['0p03','0p1','0p3','1','3'] ]
-sig_files = ["data/lhe/outS_mZD{}_mND{}.lhe.gz".format(*p) for p in sig_mZd_mNd]
-all_files = sig_files + ['data/lhe/outB1M.lhe.gz']
-
-for fname in all_files:
+print("Converting the signal mass points")
+for p in sig_pairs:
+    fname = "data/lhe/outS_{}.lhe.gz".format(sig_tags[p])
     new_fname = fname.replace('.lhe.gz','.root').replace('/lhe/','/root/')
     print( "Converting {} to {}".format(fname,new_fname) )
-    convert(fname,new_fname)
+    # convert(fname,new_fname)
+
+print("Converting the W background events")
+fname='data/lhe/outB1M.lhe.gz'
+new_fname = fname.replace('.lhe.gz','.root').replace('/lhe/','/root/')
+print( "Converting {} to {}".format(fname,new_fname) )
+# convert(fname,new_fname)
+
+
+print("Printing out the signal mass point cross section values (in pb)")
+import subprocess
+for p in sig_pairs:
+    fname = "data/lhe/outS_{}.lhe.gz".format(sig_tags[p])
+    proc = subprocess.run(["zgrep", "Integrated", fname], capture_output=True)
+    xs = proc.stdout.rstrip().split()[-1].decode()
+    print( '"{}" : {},'.format(sig_tags[p],xs))
     
 # print (all_files)
 
