@@ -20,14 +20,19 @@ define vl = ve vm vt
 define vl~ = ve~ vm~ vt~
 ### generate p p > w- > mu- vm~ e+ e- / zd
 generate p p > w- > mu- vm~ e+ e-
+# add process p p > w- > mu- vm~ e+ e- j
 # generate p p > w- > mu- vm~ 
 # generate p p > w- 
 output Generation
 # output TMPOUTPUT
-! cp TOPDIR/cards/param_card.dat Generation/bin/internal/ufomodel/param_card.dat
+# ! cp TOPDIR/cards/param_card.dat Generation/bin/internal/ufomodel/param_card.dat
 launch
+shower=Pythia8
 0
-TOPDIR/cards/param_card.dat
+# TOPDIR/cards/param_card.dat
 TOPDIR/cards/run_card.dat
+TOPDIR/cards/pythia8_card.dat
 set nevents TMPNEVENTS
+set sde_strategy 2 # needed for B but not S apparently??
+set iseed TMPSEED 
 0

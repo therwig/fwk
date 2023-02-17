@@ -19,7 +19,7 @@ define l- = e- mu-
 define vl = ve vm vt
 define vl~ = ve~ vm~ vt~
 generate p p > w- > mu- vm~ zd, zd > e+ e-
-# generate p p > w- > mu- vm~ zd j, zd > e+ e-
+# add process p p > w- > mu- vm~ zd j, zd > e+ e-
 # generate p p > w- > mu- vm~ zd
 output Generation
 # output TMPOUTPUT

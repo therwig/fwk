@@ -72,7 +72,7 @@ def convert(i, o, addLeps=True):
 def convertHepMC(i, o, addLeps=True):
     o = ROOT.TFile(o,'recreate')
     t = ROOT.TTree('Events','')
-    MAXLEN=100
+    MAXLEN=5000
 
     # output all gen particles
     n = array('i',[0])
@@ -88,6 +88,18 @@ def convertHepMC(i, o, addLeps=True):
     t.Branch("GenPart_pdgId" ,pdg ,"GenPart_pdgId[nGenPart]/I" )
     status = array('i', [0]*MAXLEN)
     t.Branch("GenPart_status" ,status ,"GenPart_status[nGenPart]/I" )
+    nParents = array('i', [0]*MAXLEN)
+    t.Branch("GenPart_nParents" ,nParents ,"GenPart_nParents[nGenPart]/I" )
+    nChildren = array('i', [0]*MAXLEN)
+    t.Branch("GenPart_nChildren" ,nChildren ,"GenPart_nChildren[nGenPart]/I" )
+    parentPdgId = array('i', [0]*MAXLEN)
+    t.Branch("GenPart_parentPdgId" ,parentPdgId ,"GenPart_parentPdgId[nGenPart]/I" )
+    childPdgId = array('i', [0]*MAXLEN)
+    t.Branch("GenPart_childPdgId" ,childPdgId ,"GenPart_childPdgId[nGenPart]/I" )
+    childIdx = array('i', [0]*MAXLEN)
+    t.Branch("GenPart_childIdx" ,childIdx ,"GenPart_childIdx[nGenPart]/I" )
+    parentIdx = array('i', [0]*MAXLEN)
+    t.Branch("GenPart_parentIdx" ,parentIdx ,"GenPart_parentIdx[nGenPart]/I" )
 
     # gen met
     met = array('f',[0])
@@ -126,6 +138,10 @@ def convertHepMC(i, o, addLeps=True):
         # for i, p in enumerate(e.particles):
         metx=0
         mety=0
+        id2idx={}
+        # print( len(e.particles) )
+        for idx, p in enumerate(e.particles):
+            id2idx[p.id]=idx
         for p in e.particles:
             if abs(p.pid) in [12,14,16] and p.status==1:
                 metx += p.momentum[0]
@@ -143,6 +159,12 @@ def convertHepMC(i, o, addLeps=True):
             arrs['mass'][ n[0] ] = p.generated_mass
             pdg[ n[0] ] = int(p.pid)
             status[ n[0] ] = int(p.status)
+            nParents[ n[0] ] = int(len(p.parents))
+            nChildren[ n[0] ] = int(len(p.children))
+            parentPdgId[ n[0] ] = p.parents[0].pid if len(p.parents) else 0
+            childPdgId[ n[0] ] = p.children[0].pid if len(p.children) else 0
+            parentIdx[ n[0] ] = id2idx[p.parents[0].id] if len(p.parents) else 0
+            childIdx[ n[0] ] = id2idx[p.children[0].id] if len(p.children) else 0
             
             if status[ n[0] ] == 1 and (abs(pdg[ n[0] ]) in [11,13]):
                 # check for ancestor
@@ -151,19 +173,20 @@ def convertHepMC(i, o, addLeps=True):
                     parents = parents[0].parents
                 parents_ids = [abs(x.pid) for x in parents]
                 good_ancestor=False
-                for x in [23,24,32,74]:
+                for x in [1,2,3,4,5,23,24,32,74]: # must include quarks to pickup the hard process
                     if x in parents_ids:
                         good_ancestor = True
                         break
-                if not good_ancestor: continue
-                    
-                arrsLep['pt'][ nLep[0] ]   = arrs['pt'][ n[0] ]   
-                arrsLep['eta'][ nLep[0] ]  = arrs['eta'][ n[0] ] 
-                arrsLep['phi'][ nLep[0] ]  = arrs['phi'][ n[0] ] 
-                arrsLep['mass'][ nLep[0] ] = arrs['mass'][ n[0] ] 
-                pdgLep[ nLep[0] ]          = pdg[ n[0] ] 
-                statusLep[ nLep[0] ]       = status[ n[0] ] 
-                nLep[0] += 1
+                if good_ancestor:
+                    arrsLep['pt'][ nLep[0] ]   = arrs['pt'][ n[0] ]   
+                    arrsLep['eta'][ nLep[0] ]  = arrs['eta'][ n[0] ] 
+                    arrsLep['phi'][ nLep[0] ]  = arrs['phi'][ n[0] ] 
+                    arrsLep['mass'][ nLep[0] ] = arrs['mass'][ n[0] ] 
+                    pdgLep[ nLep[0] ]          = pdg[ n[0] ] 
+                    statusLep[ nLep[0] ]       = status[ n[0] ] 
+                    nLep[0] += 1
+                # else:
+                #     print(parents_ids)
             n[0] += 1
             if n[0] >= MAXLEN:
                 print ('warning, truncating particles from event in HepMC EventFormat!')

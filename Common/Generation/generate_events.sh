@@ -48,6 +48,10 @@ if [[ $PROC = sZ ]]; then
 elif [[ $PROC = s ]]; then
     sed -i '' 's|TMPMZD|'${MZD}'|g' $DIR/proc_card_mg5.dat
     sed -i '' 's|TMPMND|'${MND}'|g' $DIR/proc_card_mg5.dat
+elif [[ $PROC = b ]]; then
+    SEED=`date +%s`
+    let "SEED = SEED % 100000" # cant be too big apparently..
+    sed -i '' 's|TMPSEED|'${SEED}'|g' $DIR/proc_card_mg5.dat
 fi
 
 echo Entering directory $DIR
