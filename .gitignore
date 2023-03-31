@@ -1,3 +1,6 @@
 *~
 *.pyc
 .DS_Store
+Common/Generation/eventOuputs*
+Common/Generation/eventOutputs*
+Common/Generation/PROC*
