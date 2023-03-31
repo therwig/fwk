@@ -7,6 +7,7 @@ refUm4 = 1.0e-2
 
 # list of masses generated
 sig_pairs = [ (mzd,'10') for mzd in ['0p002','0p003','0p01','0p03','0p1','0p3','1','3'] ]
+sig_pairs = [ (mzd,'10') for mzd in ['0p01','0p03','0p1','0p3','1','3'] ]
 sig_pairs+= [ ('0p03',mnd) for mnd in ['0p07','0p1','0p3','1','3'] ]
 # sig_pairs = [ ('0p03','0p07') ] 
 # and some associated helpers
@@ -28,23 +29,24 @@ def sortByND(aDict): return sortByKeyMass(aDict, keyMass=1)
 
 # Currently these are printout out at the LHE-reading step and filled here by hand.
 xsecs={ # all in pb (MG5 default)
-    'b': 1.4758064474251178,
+    'b': 3.76,
     # generated according to the parameters listed above
-    # based on the process "p p > w- > mu- vm~"
-    "mZD0p03_mND0p07" : 0.216237066059297,
-    "mZD0p03_mND0p1" : 0.21567405402742099,
-    "mZD0p03_mND0p3" : 0.21543524959280136,
-    "mZD0p03_mND1" : 0.21547111240421904,
-    "mZD0p03_mND3" : 0.21480848532452002,
-    "mZD0p03_mND10" : 0.20945157574000003,
+    # from the process "p p > w- > mu- vm~ zd" + CC
+    #   without the Z' decayed
+    "mZD0p03_mND0p07" : 1.491,
+    "mZD0p03_mND0p1"  : 1.49,
+    "mZD0p03_mND0p3"  : 1.489,
+    "mZD0p03_mND1"  : 1.489,
+    "mZD0p03_mND3"  : 1.488,
+    "mZD0p03_mND10" : 1.448,
 
-    "mZD0p002_mND10" : 1.101714955,
-    "mZD0p003_mND10" : 0.5884025471000001,
-    "mZD0p01_mND10" : 0.23680761574999998,
-    "mZD0p1_mND10" : 0.20967051814520002,
-    "mZD0p3_mND10" : 0.14754557280233,
-    "mZD1_mND10" : 0.14266838948370802,
-    "mZD3_mND10" : 0.115890748779982,
+    # "mZD0p002_mND10" : 3.07,
+    "mZD0p003_mND10" : 1.669,
+    "mZD0p01_mND10"  : 1.415,
+    "mZD0p1_mND10"   : 1.452,
+    "mZD0p3_mND10"   : 1.452,
+    "mZD1_mND10"     : 1.452,
+    "mZD3_mND10"     : 1.452,
     # # fix ND=10 GeV. Scan ZD
     # 'mZD0p03_mND10' : 0.5998,
     # 'mZD0p1_mND10'  : 0.6017,
@@ -57,6 +59,9 @@ xsecs={ # all in pb (MG5 default)
     # 'mZD0p03_mND1'   : 0.6172,
     # 'mZD0p03_mND3'   : 0.616 ,
 }
+# apply k factor
+for n in xsecs: xsecs[n] = 1.37 * xsecs[n]
+
 WmuNu = 6198 # pb (generate p p > w- > mu- vm~)
 # Usqr / (np.power(1-np.power(mN/mW,2),2) * (1+np.power(mN/mW,2)/2))
 

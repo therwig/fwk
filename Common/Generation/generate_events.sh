@@ -10,6 +10,8 @@ if [[ $1 = sZ ]]; then
     PROC=sZ
 elif [[ $1 = s ]]; then
     PROC=s
+elif [[ $1 = bZ ]]; then
+    PROC=bZ
 fi
 shift;
 DIR=$1; shift;
@@ -24,6 +26,8 @@ elif [[ $PROC = s ]]; then
     CARD=proc_card_mg5_sig.tpl;
     MZD=$1; shift;
     MND=$1; shift;
+elif [[ $PROC = bZ ]]; then
+    CARD=proc_card_mg5_bkg_Zd4L.tpl; shift;
 else
     CARD=proc_card_mg5_bkg.tpl; shift;
 fi
@@ -49,6 +53,10 @@ elif [[ $PROC = s ]]; then
     sed -i '' 's|TMPMZD|'${MZD}'|g' $DIR/proc_card_mg5.dat
     sed -i '' 's|TMPMND|'${MND}'|g' $DIR/proc_card_mg5.dat
 elif [[ $PROC = b ]]; then
+    SEED=`date +%s`
+    let "SEED = SEED % 100000" # cant be too big apparently..
+    sed -i '' 's|TMPSEED|'${SEED}'|g' $DIR/proc_card_mg5.dat
+elif [[ $PROC = bZ ]]; then
     SEED=`date +%s`
     let "SEED = SEED % 100000" # cant be too big apparently..
     sed -i '' 's|TMPSEED|'${SEED}'|g' $DIR/proc_card_mg5.dat

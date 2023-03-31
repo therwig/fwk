@@ -18,14 +18,16 @@ define l+ = e+ mu+
 define l- = e- mu-
 define vl = ve vm vt
 define vl~ = ve~ vm~ vt~
-generate p p > zd > zd vm~ zd vm, zd > e+ e-
+generate p p > zd > zd vm~ zd vm #, zd > e+ e- # decay w pythia instead?
 output Generation
 # output TMPOUTPUT
 ! cp TOPDIR/cards/param_card.dat Generation/bin/internal/ufomodel/param_card.dat
 launch
+shower=Pythia8
 0
 TOPDIR/cards/param_card.dat
 TOPDIR/cards/run_card.dat
+TOPDIR/cards/pythia8_card.dat
 set nevents TMPNEVENTS
 set mzd TMPMZD
 set mnm TMPMND

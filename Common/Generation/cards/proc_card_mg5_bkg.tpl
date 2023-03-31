@@ -18,11 +18,10 @@ define l+ = e+ mu+
 define l- = e- mu-
 define vl = ve vm vt
 define vl~ = ve~ vm~ vt~
-### generate p p > w- > mu- vm~ e+ e- / zd
-generate p p > w- > mu- vm~ e+ e-
-# add process p p > w- > mu- vm~ e+ e- j
+generate p p > w+ > mu+ vm e+ e-
+add process p p > w- > mu- vm~ e+ e-
 # generate p p > w- > mu- vm~ 
-# generate p p > w- 
+# generate p p > w-
 output Generation
 # output TMPOUTPUT
 # ! cp TOPDIR/cards/param_card.dat Generation/bin/internal/ufomodel/param_card.dat

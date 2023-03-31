@@ -2,7 +2,7 @@ import pylhe, pyhepmc, ROOT
 from array import array
 import numpy as np
 
-def convert(i, o, addLeps=True):
+def convert(i, o, addLeps=True, maxEvents=-1, doSkim=False):
     o = ROOT.TFile(o,'recreate')
     t = ROOT.TTree('Events','')
     MAXLEN=20
@@ -39,7 +39,8 @@ def convert(i, o, addLeps=True):
         t.Branch("Lep_status" ,statusLep ,"Lep_status[nLep]/I" )
     
     events = pylhe.read_lhe(i)
-    for e in events:
+    for ie, e in enumerate(events):
+        if maxEvents>=0 and ie >= maxEvents: break
         n[0] = len(e.particles)
         # for i in range(len(pt)): pt.pop()
         # pt.fromlist( [0] * n[0] )
@@ -69,7 +70,7 @@ def convert(i, o, addLeps=True):
     t.Write()
     o.Close()
 
-def convertHepMC(i, o, addLeps=True):
+def convertHepMC(i, o, addLeps=True, maxEvents=-1, doSkim=False):
     o = ROOT.TFile(o,'recreate')
     t = ROOT.TTree('Events','')
     MAXLEN=5000
@@ -125,7 +126,9 @@ def convertHepMC(i, o, addLeps=True):
     
     events = pyhepmc.open(i)
     
-    for e in events:
+    for ie, e in enumerate(events):
+        if maxEvents>=0 and ie >= maxEvents: break
+        passSkim=False
         # print( [p for p in e.particles if abs(p.pid) in [11,13] and p.status==1] )
         # exit(0)
         # n[0] = len(e.particles)
@@ -173,7 +176,7 @@ def convertHepMC(i, o, addLeps=True):
                     parents = parents[0].parents
                 parents_ids = [abs(x.pid) for x in parents]
                 good_ancestor=False
-                for x in [1,2,3,4,5,23,24,32,74]: # must include quarks to pickup the hard process
+                for x in [1,2,3,4,5,22,23,24,32,74]: # must include quarks to pickup the hard process
                     if x in parents_ids:
                         good_ancestor = True
                         break
@@ -194,7 +197,9 @@ def convertHepMC(i, o, addLeps=True):
         metVec = ROOT.TVector3(metx,mety,0)
         met[0] = metVec.Pt()
         metPhi[0] = metVec.Phi()
-        t.Fill()
+        passSkim = (nLep[0]==3) and (11 in pdgLep[:3]) and (-11 in pdgLep[:3]) and ((13 in pdgLep[:3]) or (-13 in pdgLep[:3]))
+        if (not doSkim) or passSkim:
+            t.Fill()
 
     t.Write()
     o.Close()

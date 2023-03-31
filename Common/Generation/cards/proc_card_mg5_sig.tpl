@@ -18,7 +18,8 @@ define l+ = e+ mu+
 define l- = e- mu-
 define vl = ve vm vt
 define vl~ = ve~ vm~ vt~
-generate p p > w- > mu- vm~ zd, zd > e+ e-
+generate p p > w- > mu- vm~ zd #, zd > e+ e-
+add process p p > w+ > mu+ vm zd #, zd > e+ e-
 # add process p p > w- > mu- vm~ zd j, zd > e+ e-
 # generate p p > w- > mu- vm~ zd
 output Generation
@@ -29,9 +30,11 @@ shower=Pythia8
 0
 TOPDIR/cards/param_card.dat
 TOPDIR/cards/run_card.dat
+TOPDIR/cards/pythia8_card.dat
 set nevents TMPNEVENTS
 set mzd TMPMZD
 set mnm TMPMND
 set wzd auto
 set wnm auto
+set iseed 10
 0

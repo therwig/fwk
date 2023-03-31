@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys, os, argparse
 sys.argv.append('-b-')
 import ROOT
@@ -13,13 +14,17 @@ hnames = GetHNames()
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument("--plotDir", default='plots', help="Directory in which to save plots")
-parser.add_argument("--lumi", default=150., help="Target luminosity [in 1/fb]")
-parser.add_argument("--adhocSigRescale", default=1., help="Rescale signal yields, for illustration")
+parser.add_argument("--histDir", default='histograms', help="Directory to read the histograms from")
+parser.add_argument("--lumi", default=150., type=float, help="Target luminosity [in 1/fb]")
+parser.add_argument("--adhocSigRescale", default=1., type=float, help="Rescale signal yields, for illustration")
+parser.add_argument("--flatBkgSyst", default=0.01, type=float, help="Systematic uncertainty")
 parser.add_argument("--dumpHists", action="store_true", default=False, help="Dump plots of all histograms")
+parser.add_argument("--debugFits", action="store_true", default=False, help="Debug the chi2 fits")
 args = parser.parse_args()
 
-sig_files = {p: ROOT.TFile("histograms/outS_{}.root".format(sig_tags[p])) for p in sig_pairs}
-bkg_file = ROOT.TFile('histograms/outB1M.root','read')
+sig_files = {p: ROOT.TFile(args.histDir+"/outS_{}.root".format(sig_tags[p])) for p in sig_pairs}
+# bkg_file = ROOT.TFile('histograms/outB1M.root','read')
+bkg_file = ROOT.TFile(args.histDir+'/bSplit.root','read')
 
 h={}
 for cn in cuts:
@@ -73,11 +78,15 @@ if args.dumpHists:
                  labs=procLabs, fcolz=[18], legstyle=legsty,
                  ytitle='events', dopt='hist', logx=doLogX, logy=1, ymin=0.1,
                  pdir=pdir+'/byCut')
+                    
         for t in procTags:
             plot(t+'_'+hname, [h[(t,cutname,hname)] for cutname in cuts],
                  labs=[cutname for cutname in cuts], fcolz=[18], legstyle=legsty,
                  ytitle='events', dopt='hist', logx=doLogX,
                  pdir=pdir+'/byProcess')
+    for cutname in cuts:
+        with open(args.plotDir+'/dumps/yields/'+cutname+'.txt','w') as ftxt:
+            for t in procTags: ftxt.write( "{} : {:.2f}\n".format(t,h[(t,cutname,'yields')].GetBinContent(1)) )
 
 ###
 ### Now produce the S/B histograms for "limit-setting"
@@ -92,7 +101,7 @@ for cutname in cuts:
         for ibin in range(1,srb.GetNbinsX()+1):
             _s = s.GetBinContent(ibin)
             _b = b.GetBinContent(ibin)
-            srb.SetBinContent(ibin, _s/sqrt(_b if _b else 1.))
+            srb.SetBinContent(ibin, _s/sqrt(_b+(args.flatBkgSyst*_b)**2) if _b else 1e-6)
         # calc here and store
         h[('sb',sig,cutname,hname)] = sb
         h[('srb',sig,cutname,hname)] = srb
@@ -149,8 +158,8 @@ plotGraphs('yields_nd', [gsets['mZD0p03'][x] for x in gsets['mZD0p03']],
     
 
 # Find limits, rescaling signal to achieve S/sqrt(B)=2
-gsets['mZD0p03_chi2'] = {}
-gsets['mND10_chi2'] = {}
+gsets['mZD0p03'] = {}
+gsets['mND10'] = {}
 for cutname in cuts:
     srbTarget=2 # "two sigma exclusion"
     for scanName, sigTags in [('mZD0p03',procTags_mZD0p03),('mND10',procTags_mND10)]:
@@ -164,10 +173,11 @@ for cutname in cuts:
             xvals.append(mZd if 'mND' in scanName else mNd)
             yvals.append(maxReach)
         g = ROOT.TGraph(len(xvals),array('d',xvals), array('d',yvals))
+        sortGraph(g)
         g.SetName(cutname+'_'+hname+'_reach_'+('zd' if 'mND' in scanName else 'nd'))
         gsets[scanName][g.GetName()] = g
 
-eps2Min, eps2Max = 1e-7, 1e-4
+eps2Min, eps2Max = 1e-8, 1e-3
 pdir=args.plotDir+'/limits'
 plotGraphs('srb_reach_zd', [gsets['mND10'][x] for x in gsets['mND10']],
            xtitle='m(Z_{d}) [MeV]', ytitle='|U_{#mu 4}|^{2}',
@@ -193,13 +203,23 @@ for cutname in cuts:
         xvals, yvals = [],[]
         for t in sigTags:
             s = h[(t,cutname,hname)]
-            sigStrengthExcl = getMuSigInterval(s, b, flatBkgSyst=1, maxChi2=nSigmaTarget*nSigmaTarget)
+            if args.debugFits:
+                debugName = "{}/debug/{}_{}_{}_{}".format(pdir,cutname,hname,scanName,t)
+                os.system('mkdir -p '+pdir+'/debug')
+            else:
+                debugName = ''
+            if not ('dPhi_meeS_logx1_mND10_mZD0p3_mND10' in debugName): debugName=''
+            # make a nominal 'pseudodataset' w/ correct stat errors
+            pseudoData = b.Clone("pseudo")
+            for i in range(b.GetNbinsX()+2): pseudoData.SetBinError(i, sqrt(pseudoData.GetBinContent(i)))
+            sigStrengthExcl = getMuSigInterval(s, pseudoData, flatBkgSyst=args.flatBkgSyst, plotName=debugName)
             mZd = float(t.split('_')[0][3:].replace('p','.'))
             mNd = float(t.split('_')[1][3:].replace('p','.'))
             maxReach = (sigStrengthExcl * refUm4*refUm4)
             xvals.append(mZd if 'mND' in scanName else mNd)
             yvals.append(maxReach)
         g = ROOT.TGraph(len(xvals),array('d',xvals), array('d',yvals))
+        sortGraph(g)
         g.SetName(cutname+'_'+hname+'_reach_'+('zd' if 'mND' in scanName else 'nd'))
         gsets[scanName][g.GetName()] = g
 
