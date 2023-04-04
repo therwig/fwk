@@ -6,18 +6,18 @@ from cfg.samples import sig_pairs, sig_tags
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument("--signals", default=None, help="Comma-separated list of signal points to run")
 parser.add_argument("--doBackground", action="store_true", default=False, help="Convert the background")
-parser.add_argument("--hepmc", action="store_true", default=False, help="Use HepMC inputs")
+parser.add_argument("--hepmc", action="store_false", default=True, help="Use HepMC inputs")
 parser.add_argument("--maxEvents", default=-1, type=int, help="Maximum events to process")
 parser.add_argument("--skim", action="store_true", default=False, help="Skim to reguire Zd > ee decay")
 args = parser.parse_args()
 
-stem='outS_mZD0p3_mND1'
-stem='outS_mZD1_mND3'
-stem='outS_mZD0p1_mND0p3'
-fname='data/hepmc/4l/eventOutputsZDchan230323/'+stem+'.hepmc.gz'
-new_fname='data/root/4l/eventOutputsZDchan230323/'+stem+'.root'
-convertHepMC(fname,new_fname) #, maxEvents=args.maxEvents, doSkim=args.skim)
-exit(0)
+# stem='outS_mZD0p3_mND1'
+# stem='outS_mZD1_mND3'
+# stem='outS_mZD0p1_mND0p3'
+# fname='data/hepmc/4l/eventOutputsZDchan230323/'+stem+'.hepmc.gz'
+# new_fname='data/root/4l/eventOutputsZDchan230323/'+stem+'.root'
+# convertHepMC(fname,new_fname) #, maxEvents=args.maxEvents, doSkim=args.skim)
+# exit(0)
 
 good_pairs = sig_pairs
 if not (args.signals is None):
@@ -39,7 +39,8 @@ for p in good_pairs:
 if args.doBackground:
     print("Converting the W background events")
     if args.hepmc:
-        for i in range(2,26):
+        # for i in range(2,26):
+        for i in range(1,26):
             fname='data/hepmc/eventOuputsBkgPythiaSplit25/bSplit{}.hepmc.gz'.format(i)
             new_fname = fname.replace('.hepmc.gz','.root').replace('/hepmc/','/root/')
             print( " Converting {} to {}".format(fname,new_fname) )

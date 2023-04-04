@@ -123,6 +123,10 @@ def convertHepMC(i, o, addLeps=True, maxEvents=-1, doSkim=False):
         t.Branch("Lep_pdgId" ,pdgLep ,"Lep_pdgId[nLep]/I" )
         statusLep = array('i', [0]*MAXLEN)
         t.Branch("Lep_status" ,statusLep ,"Lep_status[nLep]/I" )
+        parentLep = array('i', [0]*MAXLEN)
+        t.Branch("Lep_parentPdgId", parentLep ,"Lep_parentPdgId[nLep]/I" )
+        gparentLep = array('i', [0]*MAXLEN)
+        t.Branch("Lep_gparentPdgId", gparentLep ,"Lep_gparentPdgId[nLep]/I" )
     
     events = pyhepmc.open(i)
     
@@ -149,7 +153,7 @@ def convertHepMC(i, o, addLeps=True, maxEvents=-1, doSkim=False):
             if abs(p.pid) in [12,14,16] and p.status==1:
                 metx += p.momentum[0]
                 mety += p.momentum[1]
-                continue
+                #continue
             if not abs(p.pid) in [11,13,14,23,24,32,74]: continue # leptons, bosons, Zd, Nd
             if p.pid in [q.pid for q in p.children]: continue # last copy
             if (abs(p.pid) in [11,13,14]) and p.status!=1: continue
@@ -175,11 +179,22 @@ def convertHepMC(i, o, addLeps=True, maxEvents=-1, doSkim=False):
                 while len(parents)==1 and parents[0].pid == p.pid:
                     parents = parents[0].parents
                 parents_ids = [abs(x.pid) for x in parents]
-                good_ancestor=False
+                good_ancestor=0
                 for x in [1,2,3,4,5,22,23,24,32,74]: # must include quarks to pickup the hard process
                     if x in parents_ids:
-                        good_ancestor = True
+                        good_ancestor = x
                         break
+                good_ancestor2 = 0
+                if len(parents):
+                    parent = parents[0]
+                    gparents = parent.parents
+                    while len(gparents)==1 and gparents[0].pid == p.pid:
+                        gparents = gparents[0].parents
+                    gparents_ids = [abs(x.pid) for x in gparents]
+                    for x in [1,2,3,4,5,22,23,24,32,74]: # must include quarks to pickup the hard process
+                        if x in gparents_ids:
+                            good_ancestor2 = x
+                            break
                 if good_ancestor:
                     arrsLep['pt'][ nLep[0] ]   = arrs['pt'][ n[0] ]   
                     arrsLep['eta'][ nLep[0] ]  = arrs['eta'][ n[0] ] 
@@ -187,6 +202,8 @@ def convertHepMC(i, o, addLeps=True, maxEvents=-1, doSkim=False):
                     arrsLep['mass'][ nLep[0] ] = arrs['mass'][ n[0] ] 
                     pdgLep[ nLep[0] ]          = pdg[ n[0] ] 
                     statusLep[ nLep[0] ]       = status[ n[0] ] 
+                    parentLep[ nLep[0] ]       = good_ancestor
+                    gparentLep[ nLep[0] ]      = good_ancestor2
                     nLep[0] += 1
                 # else:
                 #     print(parents_ids)

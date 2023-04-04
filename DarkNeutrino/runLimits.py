@@ -6,7 +6,7 @@ ROOT.gROOT.SetBatch(True)
 sys.argv.remove('-b-')
 from cfg.histograms import getHists, GetHNames
 from cfg.cuts import cuts
-from cfg.samples import xsecs, refUm4, refEps, refAd, sig_pairs, sig_tags, sortByND, sortByZD
+from cfg.samples import samples, bkg_names, xsecs, refUm4, refEps, refAd, sig_pairs, sig_tags, sortByND, sortByZD, paper_pairs, paper_tags
 from plotUtils import *
 from numpy import sqrt
 from array import array
@@ -22,127 +22,169 @@ parser.add_argument("--dumpHists", action="store_true", default=False, help="Dum
 parser.add_argument("--debugFits", action="store_true", default=False, help="Debug the chi2 fits")
 args = parser.parse_args()
 
-sig_files = {p: ROOT.TFile(args.histDir+"/outS_{}.root".format(sig_tags[p])) for p in sig_pairs}
-# bkg_file = ROOT.TFile('histograms/outB1M.root','read')
-bkg_file = ROOT.TFile(args.histDir+'/bSplit.root','read')
+sig_samples = [s for s in samples if not s.isSM]
+bkg_samples = [s for s in samples if s.isSM]
+sig_files = {s.name: ROOT.TFile(args.histDir+"/outS_{}.root".format(s.name)) for s in sig_samples}
+bkg_files = {s.name: ROOT.TFile(args.histDir+"/bSplit{}.root".format(s.name)) for s in bkg_samples}
+sTags = [s.name for s in samples if not s.isSM]
+bTags = [s.name for s in samples if s.isSM]
 
-h={}
+# for inclusive plotting (debugHists)
+allTags = bTags+sTags
+toStack = list(range(len(bTags)))
+sLabs = ['m_{{ZD}},m_{{ND}}=({},{}) GeV'.format(*s.pairs) for s in sig_samples]
+allLabs = bTags + sLabs
+legSty = ['f']*len(bTags) + ['l']*len(sTags)
+fColz = [s.col for s in bkg_samples] + [None]*len(sig_samples)
+lColz = [None]*len(bkg_samples) + [s.col for s in sig_samples]
+# for paper plotting
+pap_samples = [s for s in sig_samples if s.isPaper]
+papTags = bTags+[s.name for s in pap_samples]
+papLabs = bTags + ['m(Z_{{D}}) = {}, m(N_{{D}}) = {} GeV'.format(*s.pairs) for s in pap_samples]
+papSty = ['f']*len(bTags) + ['l']*(len(pap_samples))
+fPapColz = [s.col for s in bkg_samples] + [None]*len(pap_samples)
+lPapColz = [None]*len(bkg_samples) + [s.col for s in pap_samples]
+
+h={} # a record of all histograms
 for cn in cuts:
     for hname in hnames:
-        for pt in sig_pairs:
-            h[("mZD{}_mND{}".format(*pt), cn, hname)] = sig_files[pt].Get(cn+'_'+hname)
-        h[("b", cn, hname)] = bkg_file.Get(cn+'_'+hname)
+        for s in sig_samples: h[(s.name, cn, hname)] = sig_files[s.name].Get(cn+'_'+hname)
+        for s in bkg_samples: h[(s.name, cn, hname)] = bkg_files[s.name].Get(cn+'_'+hname)
 
-# plotting helpers
-procTags = ['b'] + [sig_tags[p] for p in sig_pairs]
-procLabs = ['Bkgd'] + ['m_{{ZD}},m_{{ND}}=({},{}) GeV'.format(*pt) for pt in sig_pairs]
-legsty=['f']+['l' for x in sig_pairs]
+def plotPaper(name,hs, legPos='R',
+              xtitle='', ytitle='', logx=False, logy=False):
+# def plot(name, hists, pdir='plots/', labs=[], legtitle='',
+#          xtitle='', ytitle='', rescale=None, legstyle='',toptext='',
+#          legcoors=(0.7,0.6,0.88,0.9), redrawBkg=False,
+#          xlims=None, legcols=1, gridx=False,gridy=False,
+#          logx=False, logy=False, ymin=0, ymax=None, colz=None, fcolz=None, dopt='',
+#          bsub=False, ratio = False, ratlims=(0.9,1.1)):
+    pname = os.path.basename(args.plotDir+'/paper/'+name)
+    dname = os.path.dirname(args.plotDir+'/paper/'+name)
+    legcoors=[0.6,0.55,0.88,0.9]
+    if legPos=='L':
+        legcoors[2] = 0.1 + legcoors[2] - legcoors[0]
+        legcoors[0] = 0.1
+    plot(pname, hs, pdir=dname, legcoors=(0.6,0.55,0.88,0.9),
+         toStack=toStack, labs=papLabs, legstyle=papSty,
+         fcolz=fPapColz, colz=lPapColz, 
+         logx=logx, logy=logy, dopt='hist',
+         xtitle=xtitle, ytitle=ytitle)
 
 ###
 ### preliminary: dump signal and background plot shape overlays
-if args.dumpHists:
-    pdir=args.plotDir+'/dumps/raw/'
-    for hname in hnames:
-        doLogX = ('logx' in hname)
-        for cutname in cuts:
+pdir=args.plotDir+'/dumps/raw/'
+for hname in hnames:
+    doLogX = ('logx' in hname)
+    for cutname in cuts:
+        if args.dumpHists:
             # fix the cut, plot for all processes
-            plot(cutname+'_'+hname, [h[(t,cutname,hname)] for t in procTags],
-                 labs=procLabs, fcolz=[18], legstyle=legsty,
+            plot(cutname+'_'+hname, [h[(t,cutname,hname)] for t in allTags],
+                 toStack=toStack, labs=allLabs, colz=lColz, fcolz=fColz, legstyle=legSty,
                  ytitle='event fraction', dopt='hist', logx=doLogX,
                  pdir=pdir+'/byCut')
-        for t in procTags:
+        if cutname=='incl' and hname in ['dree','metL','mupt','meeS_logx1']:
+            plotPaper('incl/'+hname, [h[(t,cutname,hname)] for t in papTags],
+                      ytitle='Event fraction', logx=doLogX,
+                      logy=('dree' in hname))
+                      
+    for t in allTags:
+        if args.dumpHists:
             plot(t+'_'+hname, [h[(t,cutname,hname)] for cutname in cuts],
-                 labs=[cutname for cutname in cuts], fcolz=[18], legstyle=legsty,
+                 labs=[cutname for cutname in cuts], legstyle=legSty,
                  ytitle='event fraction', dopt='hist', logx=doLogX,
-                 pdir=pdir+'/byProcess') 
-
+                 pdir=pdir+'/byProcess')
 ###
 ### Now produce distributions for a common set of signal parameters, run conditions
 ### Reference constants used for this sample production
 for cutname in cuts:
     for hname in hnames:
-        b = h[('b',cutname,hname)]
-        b.Scale(args.lumi*xsecs['b']*1e3) # 1e3 b/c xs is in pb
-        for sig in procTags[1:]:
-            s = h[(sig,cutname,hname)]
-            s.Scale(args.lumi*xsecs[sig]*1e3*args.adhocSigRescale) # 1e3 b/c xs is in pb
-
+        for s in samples:
+            h[(s.name,cutname,hname)].Scale(args.lumi * s.xs*1e3 * (1 if s.isSM else args.adhocSigRescale))
+            
 ###
 ### Optionally dump a second set of histograms, now properly normalized
-if args.dumpHists:
-    pdir=args.plotDir+'/dumps/yields/'
-    for hname in hnames:
-        doLogX = ('logx' in hname)
-        for cutname in cuts:
-            plot(cutname+'_'+hname, [h[(t,cutname,hname)] for t in procTags],
-                 labs=procLabs, fcolz=[18], legstyle=legsty,
+#if args.dumpHists:
+pdir=args.plotDir+'/dumps/yields/'
+for hname in hnames:
+    doLogX = ('logx' in hname)
+    for cutname in cuts:
+        if args.dumpHists:
+            plot(cutname+'_'+hname, [h[(t,cutname,hname)] for t in allTags],
+                 toStack=toStack, labs=allLabs, colz=lColz, fcolz=fColz, legstyle=legSty,
                  ytitle='events', dopt='hist', logx=doLogX, logy=1, ymin=0.1,
                  pdir=pdir+'/byCut')
-                    
-        for t in procTags:
+        if cutname in ['lep3','bdtT','cuts'] and hname in ['dree','e2pt','dPhiLepMu','meeS_logx1']:
+            plotPaper(cutname+'_yields/'+hname, [h[(t,cutname,hname)] for t in papTags],
+                      ytitle='Events', logx=doLogX, legPos=('R' if hname in ['dPhiLepMu'] else 'L'),
+                      logy=('dree' in hname))
+                
+    for t in allTags:
+        if args.dumpHists:
             plot(t+'_'+hname, [h[(t,cutname,hname)] for cutname in cuts],
-                 labs=[cutname for cutname in cuts], fcolz=[18], legstyle=legsty,
+                 labs=[cutname for cutname in cuts], legstyle=legSty,
                  ytitle='events', dopt='hist', logx=doLogX,
                  pdir=pdir+'/byProcess')
+if args.dumpHists:
     for cutname in cuts:
         with open(args.plotDir+'/dumps/yields/'+cutname+'.txt','w') as ftxt:
-            for t in procTags: ftxt.write( "{} : {:.2f}\n".format(t,h[(t,cutname,'yields')].GetBinContent(1)) )
+            for t in allTags: ftxt.write( "{} : {:.2f}\n".format(t,h[(t,cutname,'yields')].GetBinContent(1)) )
 
 ###
 ### Now produce the S/B histograms for "limit-setting"
 hname='meeS_logx1'
 for cutname in cuts:
-    b = h[('b',cutname,hname)]
-    for sig in procTags[1:]:
-        s = h[(sig,cutname,hname)]
+    # build the total background
+    bhists = [h[(t,cutname,hname)] for t in bTags]
+    bTotal = bhists[0].Clone('bTotal_'+cutname+'_'+hname); bTotal.Reset()
+    for bh in bhists: bTotal.Add(bh)
+    h[('bTotal',cutname,hname)] = bTotal
+    # calculate S/B
+    for sname in sTags:
+        s = h[(sname,cutname,hname)]
         sb = s.Clone('sb_'+s.GetName())
-        sb.Divide(b)
+        sb.Divide(bTotal)
         srb = s.Clone('srb_'+s.GetName())
         for ibin in range(1,srb.GetNbinsX()+1):
             _s = s.GetBinContent(ibin)
-            _b = b.GetBinContent(ibin)
+            _b = bTotal.GetBinContent(ibin)
             srb.SetBinContent(ibin, _s/sqrt(_b+(args.flatBkgSyst*_b)**2) if _b else 1e-6)
         # calc here and store
-        h[('sb',sig,cutname,hname)] = sb
-        h[('srb',sig,cutname,hname)] = srb
+        h[('sb',sname,cutname,hname)] = sb
+        h[('srb',sname,cutname,hname)] = srb
         
 ###
 ### Plot various limit inputs
 pdir=args.plotDir+'/limitInputs/'
 
+### S/B histograms
+for cutname in cuts:
+    plot('sb_'+cutname+'_'+hname, [h[('sb',t,cutname,hname)] for t in sTags],
+         labs=sLabs, 
+         ytitle='S/B', dopt='hist', logx=1,
+         pdir=pdir)
+    plot('srb_'+cutname+'_'+hname, [h[('srb',t,cutname,hname)] for t in sTags],
+         labs=sLabs,
+         ytitle='S/sqrt(B)', dopt='hist', logx=1,
+         pdir=pdir)
+
 # Setup exlcusion graphs for fixed ND and ZD masses
-procTags_mZD0p03 = [sig_tags[p] for p in sig_pairs if p[0]=='0p03']; #procTags_mZD0p03.sort()
-procTags_mND10 = [sig_tags[p] for p in sig_pairs if p[1]=='10']; #procTags_mND10.sort()
+samples_mZD0p03 = [s for s in sig_samples if s.pairs[0]=='0p03'];
+samples_mND10   = [s for s in sig_samples if s.pairs[1]=='10'];
 gsets={'mZD0p03':{},
        'mND10':{}
        }
-gs1={}
-gs2={}
-
-
-### S/B histograms
-for cutname in cuts:
-    plot('sb_'+cutname+'_'+hname, [h[('sb',t,cutname,hname)] for t in procTags[1:]],
-         labs=procLabs[1:], 
-         ytitle='S/B', dopt='hist', logx=1,
-         pdir=pdir)
-    plot('srb_'+cutname+'_'+hname, [h[('srb',t,cutname,hname)] for t in procTags[1:]],
-         labs=procLabs[1:], 
-         ytitle='S/sqrt(B)', dopt='hist', logx=1,
-         pdir=pdir)
     
 ### event yields per point
 for cutname in cuts:
-    for scanName, sigTags in [('mZD0p03',procTags_mZD0p03),('mND10',procTags_mND10)]:
-        xvals, yvals = [],[]
-        for t in sigTags:
-            s = h[(t,cutname,hname)]
-            mZd = float(t.split('_')[0][3:].replace('p','.'))
-            mNd = float(t.split('_')[1][3:].replace('p','.'))
+    for scanName, sigSamples in [('mZD0p03',samples_mZD0p03),('mND10',samples_mND10)]:
+        xvals, yvals = [], []
+        for samp in sigSamples:
+            s = h[(samp.name,cutname,hname)]
+            mZd, mNd = samp.masses
             xvals.append(mZd if 'mND' in scanName else mNd)
             yvals.append(s.Integral())
-        g = ROOT.TGraph(len(xvals),array('d',xvals), array('d',yvals))
-        sortGraph(g)
+        g = ROOT.TGraph(len(xvals),array('d',xvals), array('d',yvals)); sortGraph(g)
         g.SetName(cutname+'_'+hname+'_evtYields_'+('zd' if 'mND' in scanName else 'nd'))
         gsets[scanName][g.GetName()] = g
 plotGraphs('yields_zd', [gsets['mND10'][x] for x in gsets['mND10']],
@@ -156,18 +198,16 @@ plotGraphs('yields_nd', [gsets['mZD0p03'][x] for x in gsets['mZD0p03']],
            xlims=None, legcols=1,
            logy=True, logx=True, colz=None, styz=None, dopt='AL*', pdir=pdir)
     
-
 # Find limits, rescaling signal to achieve S/sqrt(B)=2
 gsets['mZD0p03'] = {}
 gsets['mND10'] = {}
 for cutname in cuts:
     srbTarget=2 # "two sigma exclusion"
-    for scanName, sigTags in [('mZD0p03',procTags_mZD0p03),('mND10',procTags_mND10)]:
-        xvals, yvals = [],[]
-        for t in sigTags:
-            _srb = h[('srb',t,cutname,hname)]
-            mZd = float(t.split('_')[0][3:].replace('p','.'))
-            mNd = float(t.split('_')[1][3:].replace('p','.'))
+    for scanName, sigSamples in [('mZD0p03',samples_mZD0p03),('mND10',samples_mND10)]:
+        xvals, yvals = [], []
+        for samp in sigSamples:
+            _srb = h[('srb',samp.name,cutname,hname)]
+            mZd, mNd = samp.masses
             refReach = _srb.GetMaximum()
             maxReach = (srbTarget/refReach * refUm4*refUm4 if refReach else 1.)
             xvals.append(mZd if 'mND' in scanName else mNd)
@@ -196,15 +236,17 @@ gsets['mZD0p03_chi2'] = {}
 gsets['mND10_chi2'] = {}
 hname='meeS_logx1' # histogram for signal extraction
 
+
 for cutname in cuts:
     nSigmaTarget=2 #TODO pass to chi2 interval fn (make configurable)
-    b = h[('b',cutname,hname)]
-    for scanName, sigTags in [('mZD0p03',procTags_mZD0p03),('mND10',procTags_mND10)]:
-        xvals, yvals = [],[]
-        for t in sigTags:
-            s = h[(t,cutname,hname)]
+    b = h[('bTotal',cutname,hname)]
+    for scanName, sigSamples in [('mZD0p03',samples_mZD0p03),('mND10',samples_mND10)]:
+        xvals, yvals = [], []
+        for samp in sigSamples:
+            _srb = h[('srb',samp.name,cutname,hname)]
+            mZd, mNd = samp.masses
             if args.debugFits:
-                debugName = "{}/debug/{}_{}_{}_{}".format(pdir,cutname,hname,scanName,t)
+                debugName = "{}/debug/{}_{}_{}_{}".format(pdir,cutname,hname,scanName,samp.name)
                 os.system('mkdir -p '+pdir+'/debug')
             else:
                 debugName = ''
@@ -213,8 +255,6 @@ for cutname in cuts:
             pseudoData = b.Clone("pseudo")
             for i in range(b.GetNbinsX()+2): pseudoData.SetBinError(i, sqrt(pseudoData.GetBinContent(i)))
             sigStrengthExcl = getMuSigInterval(s, pseudoData, flatBkgSyst=args.flatBkgSyst, plotName=debugName)
-            mZd = float(t.split('_')[0][3:].replace('p','.'))
-            mNd = float(t.split('_')[1][3:].replace('p','.'))
             maxReach = (sigStrengthExcl * refUm4*refUm4)
             xvals.append(mZd if 'mND' in scanName else mNd)
             yvals.append(maxReach)

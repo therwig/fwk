@@ -1,19 +1,68 @@
 import numpy as np
 from collections import OrderedDict
-# reference signal coupling parameters
+# reference signal couplings
 refEps =  0.00016552945 # alphaEM*eps^2 = 2e-10
 refAd  = 0.25
 refUm4 = 1.0e-2
 
-# list of masses generated
-sig_pairs = [ (mzd,'10') for mzd in ['0p002','0p003','0p01','0p03','0p1','0p3','1','3'] ]
-sig_pairs = [ (mzd,'10') for mzd in ['0p01','0p03','0p1','0p3','1','3'] ]
-sig_pairs+= [ ('0p03',mnd) for mnd in ['0p07','0p1','0p3','1','3'] ]
-# sig_pairs = [ ('0p03','0p07') ] 
-# and some associated helpers
-sig_tags = {p:"mZD{}_mND{}".format(*p) for p in sig_pairs}
+class sample(object):
+    def __init__(self, name, xs, isSM=False, col=None, isPaper=False):
+        self.name = name
+        self.xs = xs
+        self.isSM = isSM
+        self.pairs = None
+        self.masses = None
+        self.col = col
+        self.isPaper = isPaper or isSM
+
+# Currently these are printout out at the LHE-reading step and filled here by hand.
+samples = [ # all in pb (MG5 default)
+    sample('WISR',  3.76, isSM=True, col=600-10), # skim eff is included in the hist normalization!
+    sample('WZ',    3.76, isSM=True, col=432-10),
+    sample('Wto3L', 3.76, isSM=True, col=616-10),
+    # generated according to the parameters listed above
+    # from the process "p p > w- > mu- vm~ zd" + CC
+    #   without the Z' decayed
+    sample("mZD0p03_mND0p07" , 1.491),
+    sample("mZD0p03_mND0p1"  , 1.49, isPaper=True),
+    sample("mZD0p03_mND0p3"  , 1.489),
+    sample("mZD0p03_mND1"  , 1.489, isPaper=True),
+    sample("mZD0p03_mND3"  , 1.488),
+    sample("mZD0p03_mND10" , 1.448, isPaper=True),
+
+    # sample("mZD0p002_mND10", 3.07),
+    # sample("mZD0p003_mND10" , 1.669),
+    sample("mZD0p01_mND10"  , 1.415),
+    sample("mZD0p1_mND10"   , 1.452),
+    sample("mZD0p3_mND10"   , 1.452, isPaper=True),
+    sample("mZD1_mND10"     , 1.452),
+    sample("mZD3_mND10"     , 1.452, isPaper=True),
+]
+# apply k factor
+for s in samples: s.xs *= 1.37
+
+COLZ=[632,600,8,6,7,9]+list(range(40,50))
+iCol=0
+for s in samples:
+    if not s.col:
+        s.col = COLZ[iCol]
+        iCol = min(iCol+1, len(COLZ)-1)
+
+# some helpers
+bkg_names = [s.name for s in samples if s.isSM]
 def num(myStr): return float(myStr.replace('p','.'))
-sig_masses = {p: (num(p[0]),num(p[1])) for p in sig_pairs}
+for s in samples:
+    if s.isSM: continue
+    s.pairs = (s.name.split('_')[0][3:], s.name.split('_')[1][3:])
+    s.masses = (num(s.pairs[0]), num(s.pairs[1]))
+sig_pairs= [s.pairs for s in samples if not s.isSM]
+sig_tags = {s.pairs:s.name for s in samples if not s.isSM}
+sig_masses = {s.pairs:s.masses for s in samples if not s.isSM} 
+
+# selected mass points for paper plots
+paper_pairs = [('0p03','0p1'), ('0p03','1')] + [ (mzd,'10') for mzd in ['0p03','0p3','3'] ]
+paper_tags = {s.pairs:s.name for s in samples if (s.pairs in paper_pairs and not s.isSM)}
+paper_masses = {s.pairs:s.masses for s in samples if (s.pairs in paper_pairs and not s.isSM)}
 
 def sortByKeyMass(aDict, keyMass):
     massToKey = {float(k.split('_')[keyMass][3:].replace('p','.')) : k for k in aDict}
@@ -24,58 +73,6 @@ def sortByKeyMass(aDict, keyMass):
     return toRet
 def sortByZD(aDict): return sortByKeyMass(aDict, keyMass=0)
 def sortByND(aDict): return sortByKeyMass(aDict, keyMass=1)
-    
-    # keys = [k for k in aDict]
 
-# Currently these are printout out at the LHE-reading step and filled here by hand.
-xsecs={ # all in pb (MG5 default)
-    'b': 3.76,
-    # generated according to the parameters listed above
-    # from the process "p p > w- > mu- vm~ zd" + CC
-    #   without the Z' decayed
-    "mZD0p03_mND0p07" : 1.491,
-    "mZD0p03_mND0p1"  : 1.49,
-    "mZD0p03_mND0p3"  : 1.489,
-    "mZD0p03_mND1"  : 1.489,
-    "mZD0p03_mND3"  : 1.488,
-    "mZD0p03_mND10" : 1.448,
-
-    # "mZD0p002_mND10" : 3.07,
-    "mZD0p003_mND10" : 1.669,
-    "mZD0p01_mND10"  : 1.415,
-    "mZD0p1_mND10"   : 1.452,
-    "mZD0p3_mND10"   : 1.452,
-    "mZD1_mND10"     : 1.452,
-    "mZD3_mND10"     : 1.452,
-    # # fix ND=10 GeV. Scan ZD
-    # 'mZD0p03_mND10' : 0.5998,
-    # 'mZD0p1_mND10'  : 0.6017,
-    # 'mZD0p3_mND10'  : 0.6017,
-    # 'mZD1_mND10'    : 0.6017,
-    # 'mZD3_mND10'    : 0.601 ,
-    # # fix ZD=30 MeV. Scan ND
-    # 'mZD0p03_mND0p1' : 0.6166,
-    # 'mZD0p03_mND0p3' : 0.617 ,
-    # 'mZD0p03_mND1'   : 0.6172,
-    # 'mZD0p03_mND3'   : 0.616 ,
-}
-# apply k factor
-for n in xsecs: xsecs[n] = 1.37 * xsecs[n]
-
-WmuNu = 6198 # pb (generate p p > w- > mu- vm~)
-# Usqr / (np.power(1-np.power(mN/mW,2),2) * (1+np.power(mN/mW,2)/2))
-
-
-# overwrite xsecs (don't do this by default)
-# these numbers assume Umu4 = 1
-def overwriteOldXSecs():
-    mW=80.3
-    for p in sig_pairs:
-        mZd, mNd = sig_masses[p]
-        # xs = xsecs['b'] # start with inclusive 'W > mu nu' rate
-        xs = WmuNu # start with inclusive 'W > mu nu' rate
-        # xs = xs * np.power(0.25,2) * np.power(1e-4,2) * np.power(1-np.power(mNd/mW,2),2) * (1+np.power(mNd/mW,2)/2) # start with inclusive 'W > mu nu' rate
-        xs = xs * np.power(1-np.power(mNd/mW,2),2) * (1+np.power(mNd/mW,2)/2) # start with inclusive 'W > mu nu' rate
-        xsecs[sig_tags[p]] = xs
-    
-    print("new signal cross sections (overwritten) are:",xsecs)
+# legacy
+xsecs={s.name : s.xs for s in samples} # all in pb (MG5 default)

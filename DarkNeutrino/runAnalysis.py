@@ -19,6 +19,8 @@ ROOT.gROOT.ProcessLine(".L functions.cc")
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument("--signals", default=None, help="Comma-separated list of signal points to run")
 parser.add_argument("--doBackground", action="store_true", default=False, help="Convert the background")
+parser.add_argument("--doSkims", action="store_true", default=False, help="Split the background by skimming")
+# parser.add_argument("--bkgs", default=None, help="Comma-separated list of backgrounds to run") #TODO
 parser.add_argument("--maxEvents", default=100000, type=int, help="Maximum events to process")
 parser.add_argument("--fullOutput", action="store_true", default=False, help="Write fill output instead of friends")
 parser.add_argument("--bdtTag", default='', help="BDT tag to consider")
@@ -28,15 +30,32 @@ good_pairs = sig_pairs
 if not (args.signals is None):
     good_pairs = [p for p in sig_pairs if sig_tags[p] in args.signals.split(',')]
 
+bkgSkims = ["WZ", "Wto3L", "WISR"]
 
-sig_files = ["data/root/outS_{}.root".format(sig_tags[p]) for p in good_pairs]
-# all_files = sig_files + (['data/root/outB1M.root'] if args.doBackground else [])
-all_files = sig_files + (['data/root/bSplit.root'] if args.doBackground else [])
+class job(object):
+    def __init__(self, fname, skimName=''):
+        self.fname = fname
+        self.skim = bool(len(skimName))
+        self.sfx = skimName
+
+jobs = [job("data/root/outS_{}.root".format(sig_tags[p])) for p in good_pairs]
+if args.doBackground:
+    if args.doSkims:
+        for skim in bkgSkims: jobs += [job('data/root/bSplit.root',skim)]
+    else:
+        jobs += [job('data/root/bSplit.root')]
+
+for j in jobs:
+    print(j.fname, j.skim, j.sfx)
+
+# exit(0)
+
 # for tag in args.bdtTag.split(','):
 #     for fn in all_files:
 #         friendName = fn.replace('/root/','/bdt/'+tag+'/')
         
-for fname in all_files:
+def runJob(j):
+    fname = j.fname
     print ("Going to analyze the input file: ", fname)
     ifile = ROOT.TFile.Open(fname,'read')
     itree = ifile.Get('Events')
@@ -56,8 +75,9 @@ for fname in all_files:
 
     myAna = myAnalysis()
     if len(args.bdtTag): myAna.fillBDT = True
+    if j.skim: myAna.setSkim(j.sfx)
         
-    hname = fname.replace('data/root','histograms/'+args.bdtTag)
+    hname = fname.replace('data/root','histograms/'+args.bdtTag).replace('.root',j.sfx+'.root')
     os.system('mkdir -p histograms/'+args.bdtTag)
     hfile = ROOT.TFile.Open(hname,'recreate')
     myAna.bookHistos(hfile, getHists([c for c in cuts]) )
@@ -69,7 +89,11 @@ for fname in all_files:
                                         )
 
     # scale the outputs to the number of entries processed
-    sumw = myAna.sumw if myAna.sumw else 1
+    # sumw = myAna.sumw if myAna.sumw else 1
+    # sumw = myAna.cutflow['skim'] if j.skim else myAna.cutflow['good']
+    sumw = myAna.cutflow['good'] # denominator is all good events. so skim efficiency is auto-included!
+    if not sumw: sumw = 1
+    print('sumw is ', sumw)
     for hn in myAna.h.d:
         myAna.h.d[hn].Scale(1./sumw)
 
@@ -80,4 +104,13 @@ for fname in all_files:
     hfile.Write()
     hfile.Close()
     ifile.Close()
+    return sumw
 
+# from multiprocessing import Pool
+# pool = Pool(4)
+# if __name__ == '__main__':
+#     ret = dict(pool.map(runJob, jobs))
+#     print (ret)
+    
+for j in jobs:
+    runJob(j)

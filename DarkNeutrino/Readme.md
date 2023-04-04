@@ -14,4 +14,8 @@ python3 produceInputs.py --signals 'mZD0p3_mND10,mZD0p1_mND10' # a few signals
 The file paths are currently hardcoded in this file, which is essential a wrapper that calls a tool in `Common/Analysis`.
 The list of samples to read is specified in `config/samples.py`.
 
+The ROOT files are analyzed to produce histograms and/or friend trees with `runAnalysis.py`.
+```
+python3 runAnalysis.py --doBackground --signals '' # select S, B with the same flags as above
 
+```
