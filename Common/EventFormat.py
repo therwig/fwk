@@ -1,4 +1,6 @@
 import pylhe, pyhepmc, ROOT
+# from particle.pdgid import is_hadron, charge
+from particle import pdgid
 from array import array
 import numpy as np
 
@@ -105,8 +107,16 @@ def convertHepMC(i, o, addLeps=True, maxEvents=-1, doSkim=False):
     # gen met
     met = array('f',[0])
     metPhi = array('f',[0])
-    t.Branch("GenMet" ,met ,"GenMet/F" );
-    t.Branch("GenMetPhi" ,metPhi ,"GenMetPhi/F" );
+    ht = array('f',[0])
+    htc = array('f',[0]) # charged
+    # htPhi = array('f',[0])
+    # htcPhi = array('f',[0])
+    t.Branch("GenMet", met, "GenMet/F" );
+    t.Branch("GenMetPhi", metPhi, "GenMetPhi/F" );
+    t.Branch("GenHT", ht, "GenHT/F" );
+    t.Branch("GenHTc", htc, "GenHTc/F" );
+    # t.Branch("GenHTPhi", htPhi, "GenHTPhi/F" );
+    # t.Branch("GenHTcPhi", htcPhi, "GenHTPhi/F" );
     
     # output a collection of prompt leptons
     if addLeps:
@@ -145,14 +155,43 @@ def convertHepMC(i, o, addLeps=True, maxEvents=-1, doSkim=False):
         # for i, p in enumerate(e.particles):
         metx=0
         mety=0
+        ht[0]=0
+        htc[0]=0
+        # htx=0
+        # hty=0
+        # htcx=0
+        # htcy=0
         id2idx={}
         # print( len(e.particles) )
         for idx, p in enumerate(e.particles):
             id2idx[p.id]=idx
         for p in e.particles:
-            if abs(p.pid) in [12,14,16] and p.status==1:
-                metx += p.momentum[0]
-                mety += p.momentum[1]
+            # if abs(p.pid) in [12,14,16] and p.status==1:
+            if p.status==1:
+                if abs(p.pid) in [12,14,16]:
+                    metx += p.momentum[0]
+                    mety += p.momentum[1]
+                elif pdgid.is_hadron(p.pid) or p.pid==22: #get photons from pi0
+                    v3 = ROOT.TVector3(p.momentum[0],p.momentum[1],p.momentum[2])
+                    if abs(v3.Eta()) < 2.5:
+                        if p.pid==22:
+                            if v3.Pt() > 5: # em threshold
+                                ht[0] += v3.Pt()
+                                # htx += p.momentum[0]
+                                # hty += p.momentum[1]                            
+                        elif pdgid.charge(p.pid):
+                            if v3.Pt() > 2: # chg threshold
+                                ht[0] += v3.Pt()
+                                htc[0] += v3.Pt()
+                                # htx += p.momentum[0]
+                                # hty += p.momentum[1]
+                                # htcx += p.momentum[0]
+                                # htcy += p.momentum[1]
+                        else:
+                            if v3.Pt() > 10: # neutral hadron threshold
+                                ht[0] += v3.Pt()
+                                # htx += p.momentum[0]
+                                # hty += p.momentum[1]
                 #continue
             if not abs(p.pid) in [11,13,14,23,24,32,74]: continue # leptons, bosons, Zd, Nd
             if p.pid in [q.pid for q in p.children]: continue # last copy
@@ -179,11 +218,13 @@ def convertHepMC(i, o, addLeps=True, maxEvents=-1, doSkim=False):
                 while len(parents)==1 and parents[0].pid == p.pid:
                     parents = parents[0].parents
                 parents_ids = [abs(x.pid) for x in parents]
+                #if abs(p.pid)==11: print('   - Found parents', parents_ids)
                 good_ancestor=0
-                for x in [1,2,3,4,5,22,23,24,32,74]: # must include quarks to pickup the hard process
+                for x in [1,2,3,4,5,21,22,23,24,32,74]: # must include quarks, gluons to pickup the hard process
                     if x in parents_ids:
                         good_ancestor = x
                         break
+                #if abs(p.pid)==11: print('   - ancestor', good_ancestor)
                 good_ancestor2 = 0
                 if len(parents):
                     parent = parents[0]
@@ -214,6 +255,12 @@ def convertHepMC(i, o, addLeps=True, maxEvents=-1, doSkim=False):
         metVec = ROOT.TVector3(metx,mety,0)
         met[0] = metVec.Pt()
         metPhi[0] = metVec.Phi()
+        # htVec = ROOT.TVector3(htx,hty,0)
+        # ht[0] = htVec.Pt()
+        # htPhi[0] = htVec.Phi()
+        # htcVec = ROOT.TVector3(htcx,htcy,0)
+        # htc[0] = htcVec.Pt()
+        # htcPhi[0] = htcVec.Phi()
         passSkim = (nLep[0]==3) and (11 in pdgLep[:3]) and (-11 in pdgLep[:3]) and ((13 in pdgLep[:3]) or (-13 in pdgLep[:3]))
         if (not doSkim) or passSkim:
             t.Fill()

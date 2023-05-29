@@ -51,7 +51,7 @@
 #*********************************************************************
 # Renormalization and factorization scales                           *
 #*********************************************************************
- True = fixed_ren_scale  ! if .true. use fixed ren scale
+ False = fixed_ren_scale  ! if .true. use fixed ren scale
  False = fixed_fac_scale1  ! if .true. use fixed fac scale for beam 1
  False = fixed_fac_scale2  ! if .true. use fixed fac scale for beam 2
  91.188  = scale            ! fixed ren scale
@@ -111,8 +111,8 @@
  0.0  = misset    ! minimum missing Et (sum of neutrino's momenta)
  -1.0  = ptlmax    ! maximum pt for the charged leptons
  -1.0  = missetmax ! maximum missing Et (sum of neutrino's momenta)
- {} = pt_min_pdg ! pt cut for other particles (use pdg code). Applied on particle and anti-particle
- {}	= pt_max_pdg ! pt cut for other particles (syntax e.g. {6: 100, 25: 50}) 
+ {13: 5} = pt_min_pdg ! pt cut for other particles (use pdg code). Applied on particle and anti-particle
+ {13: -1.0}	= pt_max_pdg ! pt cut for other particles (syntax e.g. {6: 100, 25: 50}) 
 #
 # For display option for energy cut in the partonic center of mass frame type 'update ecut'
 #

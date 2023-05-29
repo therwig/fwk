@@ -6,26 +6,30 @@ from cfg.samples import sig_pairs, sig_tags
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument("--signals", default=None, help="Comma-separated list of signal points to run")
 parser.add_argument("--doBackground", action="store_true", default=False, help="Convert the background")
-parser.add_argument("--hepmc", action="store_false", default=True, help="Use HepMC inputs")
+parser.add_argument("--noHepmc", action="store_true", default=False, help="Use LHE instead of HepMC inputs")
 parser.add_argument("--maxEvents", default=-1, type=int, help="Maximum events to process")
 parser.add_argument("--skim", action="store_true", default=False, help="Skim to reguire Zd > ee decay")
 args = parser.parse_args()
 
 # stem='outS_mZD0p3_mND1'
 # stem='outS_mZD1_mND3'
-# stem='outS_mZD0p1_mND0p3'
-# fname='data/hepmc/4l/eventOutputsZDchan230323/'+stem+'.hepmc.gz'
-# new_fname='data/root/4l/eventOutputsZDchan230323/'+stem+'.root'
-# convertHepMC(fname,new_fname) #, maxEvents=args.maxEvents, doSkim=args.skim)
+# stem='ttz'
+# #stem='zz_part2'
+# # stem='wzhad_v0'
+# fname='data/hepmc//'+stem+'.hepmc.gz'
+# new_fname='data/root//'+stem+'.root'
+# convertHepMC(fname,new_fname, maxEvents=args.maxEvents, doSkim=args.skim)
 # exit(0)
 
 good_pairs = sig_pairs
 if not (args.signals is None):
     good_pairs = [p for p in sig_pairs if sig_tags[p] in args.signals.split(',')]
+    if len(good_pairs)==0:
+        print( 'found no matching pairs. Try one of:', [sig_tags[p] for p in sig_pairs])
 
 if len(good_pairs): print("Converting the signal mass points")
 for p in good_pairs:
-    if args.hepmc:
+    if not args.noHepmc:
         fname = "data/hepmc/outS_{}.hepmc.gz".format(sig_tags[p])
         new_fname = fname.replace('.hepmc.gz','.root').replace('/hepmc/','/root/')
         print(" Converting {} to {}".format(fname,new_fname) )
@@ -38,7 +42,7 @@ for p in good_pairs:
 
 if args.doBackground:
     print("Converting the W background events")
-    if args.hepmc:
+    if not args.noHepmc:
         # for i in range(2,26):
         for i in range(1,26):
             fname='data/hepmc/eventOuputsBkgPythiaSplit25/bSplit{}.hepmc.gz'.format(i)

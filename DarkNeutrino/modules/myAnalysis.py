@@ -13,6 +13,7 @@ class myAnalysis(Module):
         self.h = None
         self.r = ROOT.TRandom3(2022)
         self.fillBDT = False
+        self.dropLepton = False
         self.cutflow={
             'all':0,
             'good':0,
@@ -20,7 +21,7 @@ class myAnalysis(Module):
         self.doSkim={
             "WZ" : False,
             "Wto3L" : False,
-            "WISR" : False,
+            # "WISR" : False,
         }
     def setSkim(self,x):
         if x in self.doSkim:
@@ -36,18 +37,21 @@ class myAnalysis(Module):
     def setCuts(self, c):
         self.cuts = c
 
-    def smearCMS(self, p4, sf=1):
+    def smearCMS(self, p4, sf=0.5): #0=lo, 0.5=nominal, 1=hi
         # https://arxiv.org/pdf/1405.6569.pdf, Fig 17 for eta/phi
         # http://cms-results.web.cern.ch/cms-results/public-results/publications/EGM-17-001/CMS-EGM-17-001_Figure_011-a.pdf for pt
         pt=-1
-        while not pt >0: pt = p4.Pt() * self.r.Gaus(1, 0.1*sf)
-        phi = p4.Phi() + self.r.Gaus(0, 0.002*sf) # in radians for 10 GeV
+        while not pt >0: pt = p4.Pt() * self.r.Gaus(1, 0.025 + sf*(0.08-0.025))
+        phi = p4.Phi() + self.r.Gaus(0, 0.001 + sf*(0.0025-0.001)) # in radians for 10 GeV
         # cottheta is a bit better 0.0006 but can just take 0.001 for simplicity
         cottheta = 1./ROOT.TMath.Tan(p4.Theta()) # better never be 0 !
-        cottheta += self.r.Gaus(0, 0.002*sf)
+        # print('eta, theta, cottheta', p4.Eta(), p4.Theta(), cottheta)
+        cottheta += self.r.Gaus(0, 0.0005 + sf*(0.002-0.0005))
         theta = ROOT.TMath.ATan(1./cottheta)
+        if theta < 0: theta += ROOT.TMath.Pi()
         eta = -ROOT.TMath.Log(ROOT.TMath.Tan(theta/2))
         tlv = ROOT.TLorentzVector()
+        # print(' cottheta, theta eta', cottheta, theta, eta)
         tlv.SetPtEtaPhiM(pt, eta, phi, p4.M())
         return tlv
     def smearCMSMet(self, p4, sf=1):
@@ -76,8 +80,12 @@ class myAnalysis(Module):
           self.out.branch("dR_ee", "F")
           self.out.branch("dPhi_ee", "F")
           self.out.branch("m_ee", "F")
+          self.out.branch("m_ee_up", "F")
+          self.out.branch("m_ee_dn", "F")
           self.out.branch("minPtFrac_ee", "F")
           self.out.branch("met", "F")
+          self.out.branch("ht", "F")
+          self.out.branch("htc", "F")
           self.out.branch("mtMu", "F")
           self.out.branch("mtEE", "F")
           self.out.branch("pt3L", "F")
@@ -88,6 +96,12 @@ class myAnalysis(Module):
           self.out.branch("truth_meemunu", "F")
           self.out.branch("truth_eParent", "I")
           self.out.branch("truth_eGParent", "I")
+          self.out.branch("truth_el1_pt",  "F")
+          self.out.branch("truth_el1_eta", "F")
+          self.out.branch("truth_el1_phi", "F")
+          self.out.branch("truth_el2_pt",  "F")
+          self.out.branch("truth_el2_eta", "F")
+          self.out.branch("truth_el2_phi", "F")
     
     def analyze(self, event):
         self.cutflow['all'] += 1
@@ -96,16 +110,25 @@ class myAnalysis(Module):
         el1=None
         el2=None
         mu=None
+        mu2=None
         nu=None
         el1Gen=None
         for p in allParts:
             if abs(p.pdgId)==11 and (el1Gen==None): el1Gen=p
             if abs(p.pdgId)==14 and (nu==None or nu.pt < p.pt): nu=p
         for l in leps:
-            if abs(l.pdgId)==13: mu=l
+            if abs(l.pdgId)==13 and mu==None: mu=l
+            elif abs(l.pdgId)==13: mu2=l
             elif abs(l.pdgId)==11 and (el1==None): el1=l
             elif abs(l.pdgId)==11: el2=l
             # else: print('bad lepton!')
+
+        if self.dropLepton: # 'drop' a random lepton
+            if self.r.Integer(2): # 0 or 1
+                nu = mu2
+            else:
+                nu = mu
+                mu = mu2
 
         if (not el1) or (not el2) or (not mu) or (not nu):
             # print('bad event! (less than 3 leptons found)')
@@ -119,13 +142,14 @@ class myAnalysis(Module):
         mee = ee.M()
         minPtFrac = el2.pt / ee.Pt()
         mupt = mu.pt
+        mueta = mu.eta
 
         truth_mmunu = (mu.p4()+nu.p4()).M()
         truth_meemunu = (el1.p4()+el2.p4()+mu.p4()+nu.p4()).M()
-        passWISR = (el1.parentPdgId<6 or el2.parentPdgId<6)
-        passWZ = (not passWISR) and (truth_mmunu + truth_meemunu > 2*80.3)
-        passWto3L = (not passWISR) and (not passWZ)
-        if self.doSkim["WISR"] and not passWISR: return False
+        # passWISR = (el1.parentPdgId<6 or el2.parentPdgId<6)
+        passWZ = (truth_mmunu + truth_meemunu > 156.6) # 2*(mW - widW)
+        passWto3L = (not passWZ)
+        # if self.doSkim["WISR"] and not passWISR: return False
         if self.doSkim["WZ"] and not passWZ: return False
         if self.doSkim["Wto3L"] and not passWto3L: return False
         if 'skim' in self.cutflow: self.cutflow['skim'] += 1
@@ -134,19 +158,31 @@ class myAnalysis(Module):
         met = event.GenMet
         metP4 = ROOT.TLorentzVector()
         metP4.SetPtEtaPhiM(event.GenMet,event.GenMetPhi,0,0)
+        ht = event.GenHT;
+        htc = event.GenHTc #(need to reproduce root files for this unfortunately :( )
+        
 
         # CMS toy smearing
-        el1S = self.smearCMS(el1.p4())
-        el2S = self.smearCMS(el2.p4())
+        el1S, el1Sdn ,el1Sup = [self.smearCMS(el1.p4(), sf) for sf in [0.5,0,1]]
+        el2S, el2Sdn ,el2Sup = [self.smearCMS(el2.p4(), sf) for sf in [0.5,0,1]]
         e1pt = el1S.Pt()
         e2pt = el2S.Pt()
+        e1eta = el1S.Eta()
+        e2eta = el2S.Eta()
         eeS = el1S + el2S
         meeS = eeS.M()
+        meeSup = (el1Sup+el2Sup).M()
+        meeSdn = (el1Sdn+el2Sdn).M()
         if meeS!=meeS: meeS = 999
+        if meeSup!=meeSup: meeSup = 999
+        if meeSdn!=meeSdn: meeSdn = 999
         metP4S = self.smearCMSMet(metP4)
         metS = metP4S.Pt()
         metLP4 = -(eeS + mu.p4())
         metL = metLP4.Pt()
+        
+        # print('Orig : pt eta phi 1,2:', el1.p4().Pt() , el1.p4().Eta(), el1.p4().Phi(), el2.p4().Pt() , el2.p4().Eta(), el2.p4().Phi())
+        # print('     : pt eta phi 1,2:', el1S.Pt() , el1S.Eta(), el1S.Phi(), el2S.Pt() , el2S.Eta(), el2S.Phi())
         
         # if self.i<2: print(locals() )
         
@@ -179,6 +215,7 @@ class myAnalysis(Module):
         dPhiLepMet  = abs(ROOT.deltaPhi(diEle.Phi(), event.GenMetPhi))
         dPhiLepMetS = abs(ROOT.deltaPhi(diEle.Phi(), metP4S.Phi()))
         dPhiLepMu   = abs(ROOT.deltaPhi(diEle.Phi(), mu.phi))
+        dRLepMu     = ROOT.deltaR(diEle.Eta(), diEle.Phi(), mu.phi, mu.eta)
 
         dRee = el1S.DeltaR(el2S)
         pTee = ROOT.pt_2(el1S.Pt(), el1S.Phi(), el2S.Pt(), el2S.Phi())
@@ -190,9 +227,10 @@ class myAnalysis(Module):
         while meeAdHoc<0:
             meeAdHoc = self.r.Gaus(mee, 0.010 + 0.060 * mee)
             
+          
         if self.out:
           self.out.fillBranch("mu_pt", mupt)
-          self.out.fillBranch("mu_eta", mu.eta)
+          self.out.fillBranch("mu_eta", mueta)
           self.out.fillBranch("el1_pt", e1pt)
           self.out.fillBranch("el1_eta", el1S.Eta())
           self.out.fillBranch("el2_pt", e2pt)
@@ -202,8 +240,12 @@ class myAnalysis(Module):
           self.out.fillBranch("dR_ee", dRee ) 
           self.out.fillBranch("dPhi_ee", abs(ROOT.deltaPhi(el1S.Phi(), el2S.Phi())))
           self.out.fillBranch("m_ee", meeS)
+          self.out.fillBranch("m_ee_up", meeSup)
+          self.out.fillBranch("m_ee_dn", meeSdn)
           self.out.fillBranch("minPtFrac_ee", minPtFrac)
           self.out.fillBranch("met", metS)
+          self.out.fillBranch("ht", ht)
+          self.out.fillBranch("htc", htc)
           self.out.fillBranch("mtMu", mTMuL)
           self.out.fillBranch("mtEE", mTL)
           self.out.fillBranch("pt3L", metL)
@@ -214,6 +256,12 @@ class myAnalysis(Module):
           self.out.fillBranch("truth_meemunu", truth_meemunu)
           self.out.fillBranch("truth_eParent", el1.parentPdgId)
           self.out.fillBranch("truth_eGParent", el1.gparentPdgId)
+          self.out.fillBranch("truth_el1_pt",  el1.p4().Pt())
+          self.out.fillBranch("truth_el1_eta", el1.p4().Eta())
+          self.out.fillBranch("truth_el1_phi", el1.p4().Phi())
+          self.out.fillBranch("truth_el2_pt",  el2.p4().Pt())
+          self.out.fillBranch("truth_el2_eta", el2.p4().Eta())
+          self.out.fillBranch("truth_el2_phi", el2.p4().Phi())
         
         for cn in self.cuts:
             if not self.checkCut(locals(), cn): continue
@@ -229,13 +277,24 @@ class myAnalysis(Module):
             self.h[cn+'_meeS'].Fill(meeS)
             self.h[cn+'_meeS_logx1'].Fill(meeS)
             self.h[cn+'_meeS_logx2'].Fill(meeS)
+            self.h[cn+'_meeSup'].Fill(meeSup)
+            self.h[cn+'_meeSup_logx1'].Fill(meeSup)
+            self.h[cn+'_meeSup_logx2'].Fill(meeSup)
+            self.h[cn+'_meeSdn'].Fill(meeSdn)
+            self.h[cn+'_meeSdn_logx1'].Fill(meeSdn)
+            self.h[cn+'_meeSdn_logx2'].Fill(meeSdn)
             self.h[cn+'_meeAdHoc'].Fill(meeAdHoc)
             self.h[cn+'_meeAdHoc_logx1'].Fill(meeAdHoc)
             self.h[cn+'_meeAdHoc_logx2'].Fill(meeAdHoc)
             self.h[cn+'_mupt'].Fill(mupt)
+            self.h[cn+'_mueta'].Fill(mueta)
             self.h[cn+'_e1pt'].Fill(e1pt)
             self.h[cn+'_e2pt'].Fill(e2pt)
+            self.h[cn+'_e1eta'].Fill(e1eta)
+            self.h[cn+'_e2eta'].Fill(e2eta)
             self.h[cn+'_met'].Fill(met)
+            self.h[cn+'_ht'].Fill(ht)
+            self.h[cn+'_htc'].Fill(htc)
             self.h[cn+'_metS'].Fill(metS)
             self.h[cn+'_metL'].Fill(metL)
             self.h[cn+'_mtS'].Fill(mTS)
@@ -249,6 +308,7 @@ class myAnalysis(Module):
             self.h[cn+'_dPhiLepMet'].Fill(dPhiLepMet) 
             self.h[cn+'_dPhiLepMetS'].Fill(dPhiLepMetS) 
             self.h[cn+'_dPhiLepMu'].Fill(dPhiLepMu) 
+            self.h[cn+'_dRLepMu'].Fill(dRLepMu) 
 
         return True
 

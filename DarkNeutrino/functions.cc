@@ -26,5 +26,11 @@ float pt_2(float pt1, float phi1, float pt2, float phi2) {
 float mt_2(float pt1, float phi1, float pt2, float phi2) {
     return std::sqrt(2*pt1*pt2*(1-std::cos(phi1-phi2)));
 }
+float mass_2(float pt1, float eta1, float phi1, float m1, float pt2, float eta2, float phi2, float m2) {
+    typedef ROOT::Math::LorentzVector<ROOT::Math::PtEtaPhiM4D<double> > PtEtaPhiMVector;
+    PtEtaPhiMVector p41(pt1,eta1,phi1,m1);
+    PtEtaPhiMVector p42(pt2,eta2,phi2,m2);
+    return (p41+p42).M();
+}
 
 void functions(){}

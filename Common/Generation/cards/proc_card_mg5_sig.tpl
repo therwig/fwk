@@ -18,8 +18,12 @@ define l+ = e+ mu+
 define l- = e- mu-
 define vl = ve vm vt
 define vl~ = ve~ vm~ vt~
-generate p p > w- > mu- vm~ zd #, zd > e+ e-
-add process p p > w+ > mu+ vm zd #, zd > e+ e-
+# the ZD decay should be removed for cross section calculation
+# but it is best to leave it in for event generation to ensure that the
+# electron decay channel is enforced.
+# Pythia can decay the zd, but it does not like resonances lighter than 100 MeV
+generate p p > w- > mu- vm~ zd, zd > e+ e-
+add process p p > w+ > mu+ vm zd, zd > e+ e-
 # add process p p > w- > mu- vm~ zd j, zd > e+ e-
 # generate p p > w- > mu- vm~ zd
 output Generation

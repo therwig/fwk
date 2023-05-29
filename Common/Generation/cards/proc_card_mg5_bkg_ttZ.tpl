@@ -11,30 +11,22 @@ set default_unset_couplings 99
 set max_t_for_channel 99
 set zerowidth_tchannel True
 set nlo_mixed_expansion True
-### import model DarkNeutrino_Dirac
 define p = g u c d s u~ c~ d~ s~
 define j = g u c d s u~ c~ d~ s~
 define l+ = e+ mu+
 define l- = e- mu-
 define vl = ve vm vt
 define vl~ = ve~ vm~ vt~
-#generate p p > mu+ vm e+ e-
-generate p p > mu- vm~ e+ e-
-# add process p p > mu- vm~ e+ e-
-# generate p p > w+ > mu+ vm e+ e-
-# add process p p > w- > mu- vm~ e+ e-
-# generate p p > w- > mu- vm~ 
-# generate p p > w-
+generate p p > t t~ e+ e-
+#generate p p > t t~, t > e+ e- mu+ vm b, t~ > mu- vm~ b~
 output Generation
-# output TMPOUTPUT
-# ! cp TOPDIR/cards/param_card.dat Generation/bin/internal/ufomodel/param_card.dat
 launch
 shower=Pythia8
 0
 # TOPDIR/cards/param_card.dat
-TOPDIR/cards/run_card.dat
+TOPDIR/cards/run_card_zz.dat
 TOPDIR/cards/pythia8_card.dat
 set nevents TMPNEVENTS
-set sde_strategy 2 # needed for B but not S apparently??
-set iseed TMPSEED 
+set sde_strategy 1
+set iseed TMPSEED
 0

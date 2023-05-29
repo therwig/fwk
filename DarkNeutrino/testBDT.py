@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import ROOT, argparse, os
 import numpy as np
-from cfg.samples import sig_pairs, sig_tags
+from cfg.samples import sig_pairs, sig_tags, samples
 from plotUtils import *
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
@@ -173,7 +173,11 @@ def makeFriends(ifname):
     
 if args.friends:
     sig_files = ["data/friends/outS_{}.root".format(sig_tags[p]) for p in good_pairs]
-    all_files = sig_files + (['data/friends/bSplit.root'] if args.doBackground else [])
+    all_files = sig_files #+ (['data/friends/bSplit.root'] if args.doBackground else [])
+    if args.doBackground:
+        for s in samples:
+            if not s.isSM: continue
+            sig_files.append('data/friends/'+s.name+'.root')
     for fn in all_files: makeFriends(fn)
 
 if args.test:
