@@ -8,6 +8,7 @@ from cfg.histograms import getHists, GetHNames
 from cfg.cuts import cuts
 from cfg.samples import samples, bkg_names, xsecs, refUm4, refEps, refAd, sig_pairs, sig_tags, sortByND, sortByZD, paper_pairs, paper_tags
 from plotUtils import *
+from limitHelpers import *
 from numpy import sqrt, hypot
 from array import array
 hnames = GetHNames()
@@ -22,22 +23,7 @@ parser.add_argument("--dumpHists", action="store_true", default=False, help="Dum
 parser.add_argument("--debugFits", action="store_true", default=False, help="Debug the chi2 fits")
 parser.add_argument("--hllhc", action="store_true", default=False, help="Run HL-LHC setup. Otherwise Run 2")
 args = parser.parse_args()
-
-def plotPaper(name, hs, legPos='R', doNorm=False,
-              xtitle='', ytitle='', logx=False, logy=False):
-    pname = os.path.basename(args.plotDir+'/paper/'+name)
-    dname = os.path.dirname(args.plotDir+'/paper/'+name)
-    legcoors=[0.6,0.55,0.88,0.9]
-    if legPos=='L':
-        legcoors[2] = 0.1 + legcoors[2] - legcoors[0]
-        legcoors[0] = 0.1
-    plot(pname, hs, pdir=dname, legcoors=(0.55,0.50,0.88,0.9),
-         toStack=toStack, labs=papLabs, legstyle=papSty,
-         fcolz=fPapColz, colz=lPapColz, 
-         logx=logx, logy=logy, dopt='hist', spam=['#sqrt{s} = '+str(sqrts)+' TeV, '+str(lumi)+' fb^{-1}'], #,'Dark Neutrino'],
-         xtitle=xtitle, ytitle=ytitle, normStack=doNorm)
     
-#def runIt():
 sqrts = 14 if args.hllhc else 13
 lumi  = args.lumi if args.lumi else (4000 if args.hllhc else 150)
 args.plotDir += ('/hllhc/' if args.hllhc else '/run2/')
@@ -46,9 +32,6 @@ sig_samples = [s for s in samples if not s.isSM]
 bkg_samples = [s for s in samples if s.isSM]
 sig_files = {s.name: ROOT.TFile(args.histDir+"/outS_{}.root".format(s.name)) for s in sig_samples}
 bkg_files = {s.name: ROOT.TFile(args.histDir+"/{}{}.root".format(s.pfx,s.name)) for s in bkg_samples}
-# for s in bkg_samples:
-#     print(args.histDir+"/bSplit{}.root".format(s.name))
-#exit(0)
 sTags = [s.name for s in samples if not s.isSM]
 bTags = [s.name for s in samples if s.isSM]
 
@@ -194,11 +177,11 @@ for hname in hnames:
                 pname = cutname+'/'+hname if doNorm else cutname+'_yields/'+hname
                 plotPaper(pname, [h[(t,cutname,hname)] for t in papTags],
                           ytitle='Events', logx=doLogX, legPos=('R' if hname in ['dPhiLepMu'] else 'L'),
-                          logy=0, doNorm=doNorm)
+                          logy=0, doNorm=doNorm, pdir=args.plotDir)
                 if hname in logvars:
                     plotPaper(pname+'Log', [h[(t,cutname,hname)] for t in papTags],
                               ytitle='Events', logx=doLogX, legPos=('R' if hname in ['dPhiLepMu'] else 'L'),
-                              logy=1, doNorm=doNorm)
+                              logy=1, doNorm=doNorm, pdir=args.plotDir)
         # # also plot the unit-normalized variants
         # if cutname in ['incl','lep3'] and hname in paper_incl_hist_selections:
         #     plotPaper(cutname+'/'+hname, [h[(t,cutname,hname)] for t in papTags],
@@ -328,16 +311,6 @@ plotGraphs('srb_reach_nd', [gsets['mZD0p03'][x] for x in gsets['mZD0p03']],
            xlims=None, ymin=eps2Min, ymax=eps2Max, legcols=1,
            logy=True, logx=True, colz=None, styz=None, dopt='AL*', pdir=pdir)
 
-### systematics
-class uncert(object):
-    def __init__(self, name, isSF=True, forS=True, forB=True, sf=1, upName='', dnName=''):
-        self.name = name
-        self.isSF = isSF
-        self.sf   = sf
-        self.forS = forS
-        self.forB = forB
-        self.upName = upName
-        self.dnName = dnName
 uncerts=[
     uncert('lepEff',   forS=True,  forB=True, sf=3*0.05),
     uncert('fakeBkg',  forS=False, forB=True, sf=0.333), # scales 1.5 down to 1.0
@@ -480,71 +453,6 @@ for strat in ['mc','toy']:
     
 
 pdir=args.plotDir+'/limits'
-import numpy as np
-def text2graph(fname, delimiter=' ', dupLast=False, cols=[0,1]):
-    constraints = np.genfromtxt(fname,delimiter=delimiter)
-    xvals = list(constraints[:,cols[0]]) + ([constraints[0,cols[0]]] if dupLast else [])
-    yvals = list(constraints[:,cols[1]]) + ([constraints[0,cols[1]]] if dupLast else [])
-    xvals, yvals = array('d',xvals), array('d',yvals) #promblems with np
-    return  ROOT.TGraph(len(xvals), array('d',xvals), array('d',yvals))
-
-def plotSensitivity(saveName, gs, labs=[], xIsMND=True, sfx='',toRoot=True, rangex=None, pdir='./'):
-    c = ROOT.TCanvas()
-    c.SetLogy()
-    c.SetLogx()
-    mg = ROOT.TMultiGraph()
-    if xIsMND:
-        gSig1 = text2graph('external_lines/sig1v2.txt', delimiter=',', dupLast=True); gSig1.SetLineColor(ROOT.TColor.GetColor('#FFFF61'))
-        gSig2 = text2graph('external_lines/sig2v2.txt', delimiter=',', dupLast=True); gSig2.SetLineColor(ROOT.TColor.GetColor('#75FB4C'))
-        gSig3 = text2graph('external_lines/sig3v2.txt', delimiter=',', dupLast=True); gSig3.SetLineColor(ROOT.TColor.GetColor('#4FA8AA'))
-        gSig4 = text2graph('external_lines/sig4v2.txt', delimiter=',', dupLast=True); gSig4.SetLineColor(ROOT.TColor.GetColor('#0000F5'))
-        gSig5 = text2graph('external_lines/sig5v2.txt', delimiter=',', dupLast=True); gSig5.SetLineColor(ROOT.TColor.GetColor('#7B1E82'))
-        for g in [gSig1,gSig2,gSig3,gSig4,gSig5]:
-            g.SetLineWidth(2)
-            mg.Add(g)
-    else:
-        pass
-            
-    leg = ROOT.TLegend(0.6,0.5,0.9,0.75)
-    leg.SetTextFont(42)
-    leg.SetNColumns(1)
-
-    gConst = text2graph('external_lines/const_mnd.txt') #if xIsMND else text2graph('external_lines/const_mzd.txt')
-    gConst.SetLineWidth(2); gConst.SetLineColor(ROOT.kBlack)
-    mg.Add(gConst)
-    mg.Draw("AC") # dummy draw
-    for ig, g in enumerate(gs):
-        g.SetLineWidth(2)
-        g.SetLineColor(COLZ[ig+1])
-        g.SetFillColor(COLZ[ig+1])
-        g.SetFillStyle(3001)
-        mg.Add(g.Clone()) # don't transfer ownership
-        if ig < len(labs):
-            leg.AddEntry(g, labs[ig], 'fl' if g.InheritsFrom('TGraphErrors') else 'l')
-
-    if xIsMND: mg.SetTitle(";m(N_{D}) [GeV]; |U_{#mu 4}|^{2}")
-    else: mg.SetTitle(";m(Z_{D}) [GeV]; |U_{#mu 4}|^{2}")
-    mg.GetHistogram().GetXaxis().SetTitleOffset(1.3) #SetTitle(";m(N_{D}) [GeV]; |U_{#mu 4}|^{2}")
-    mg.GetHistogram().GetXaxis().SetLimits(0.01,10)
-    mg.SetMaximum(0.1)
-    mg.Draw("L3 same")
-    if rangex:
-        mg.GetHistogram().GetXaxis().SetLimits(*rangex)
-
-    leg.SetFillStyle(0) 
-    leg.SetFillColor(0)
-    leg.SetBorderSize(0)
-    if len(labs):
-        leg.Draw()
-        
-    # c.SaveAs(args.plotDir+'/limits/full_m' + ('nd' if xIsMND else 'zd') + sfx + '.pdf')
-    # if not lumi==150: sfx += '_{}fb'.format(int(lumi))
-    c.SaveAs(pdir+'/limits/full_' + saveName + sfx + '.pdf')
-    if toRoot:
-        fout = ROOT.TFile(pdir+'/limits/graphs_full_' + saveName + sfx + '.root','recreate')
-        for g in gs:
-            g.Write()
-        fout.Close()
 
 c = ROOT.TCanvas()
 c.SetLogy(); c.SetLogx()
@@ -554,93 +462,6 @@ brEl.SetTitle(';m(Z_{D}) [GeV];BR(Z_{D} #rightarrow ee/#mu#mu)')
 brEl.Draw('AL')
 brMu.Draw('L same')
 c.SaveAs('br.pdf')
-
-def CombSig(g1, g2, debug=False):
-    xs, ys = [], []
-    if g1.GetN() != g2.GetN():
-        print('mismatch in number of points!')
-        return
-    for i in range(g1.GetN()):
-        x1 = g1.GetX()[i]
-        x2 = g2.GetX()[i]
-        if abs(x2-x1) > 1e-5:
-            print('mismatch in point x values!')
-            return
-        s1 = g1.GetY()[i]
-        s2 = g2.GetY()[i]
-        xs.append(x1)
-        if s1==0: ys.append(s2)
-        elif s2==0: ys.append(s1)
-        else: ys.append( s1*s2/hypot(s1,s2) )
-    gNew = ROOT.TGraph(len(xs),array('d',xs), array('d',ys))
-    return gNew
-    
-def ApplyBR(g, isEl=True, debug=False):
-    withElx=[]
-    withEly=[]
-    gxvals = g.GetX()
-    br = brEl if isEl else brMu
-    if debug:
-        print('input points:')
-        print(' x:',[g.GetX()[i] for i in range(g.GetN())])
-        print(' y:',[g.GetY()[i] for i in range(g.GetN())])
-    for i in range(br.GetN()):
-        x = br.GetX()[i]
-        if debug: print('considering',x,'...',end='')
-        if x < gxvals[0]: continue
-        if x > gxvals[g.GetN()-1]: continue
-        withElx.append(x)
-        withEly.append( g.Eval(x) / br.GetY()[i] )
-        if debug: print(' added',withElx[-1], withEly[-1],' from limit',g.Eval(x),' and BR =',br.GetY()[i] )
-    gNew = ROOT.TGraph(len(withElx),array('d',withElx), array('d',withEly))
-    return gNew
-
-def makeUnc(u,d):
-    if u.GetN() != d.GetN():
-        return
-    N = u.GetN()
-    g = ROOT.TGraphErrors(N)
-    for i in range(N):
-        x1 = u.GetX()[i]
-        y1 = u.GetY()[i]
-        x2 = d.GetX()[i]
-        y2 = d.GetY()[i]
-        if abs(x1-x2)>1e-6:
-            print('mismatch!',x1,x2)
-            return
-        g.SetPoint(i, x1, (y1+y2)/2.)
-        g.SetPointError(i, 0, abs((y1-y2))/2.)
-        #print('Setting {} and {} +/- {} from {} and {}'.format(x1, (y1+y2)/2., abs((y1-y2))/2., y1, y2))
-    return g
-def makeUncFromMany(gs):
-    lens = [g.GetN() for g in gs]
-    if (max(lens) != min(lens)) or len(gs)==0:
-        print ('makeUncFromMany mismatch',[(g.GetName(),g.GetN()) for g in gs])
-        return
-    N = gs[0].GetN()
-    g = ROOT.TGraphErrors(N)
-    for i in range(N):
-        xs = [g.GetX()[i] for g in gs]
-        ys = [g.GetY()[i] for g in gs]        
-        if max(xs)-min(xs)>1e-6:
-            print('makeUncFromMany mismatch!',i,' yields ',xs)
-            return
-        ymax = max(ys)
-        ymin = min(ys)
-        g.SetPoint(i, xs[0], (ymax+ymin)/2.)
-        g.SetPointError(i, 0, (ymax-ymin)/2.)
-        #print('Setting {} and {} +/- {} from {} and {}'.format(x1, (y1+y2)/2., abs((y1-y2))/2., y1, y2))
-    return g
-def splitErrGraph(gErr):
-    N = gErr.GetN()
-    xs = [gErr.GetX()[i] for i in range(N)]
-    ys = [gErr.GetY()[i] for i in range(N)]
-    us = [gErr.GetY()[i] + gErr.GetEY()[i] for i in range(N)]
-    ds = [gErr.GetY()[i] - gErr.GetEY()[i] for i in range(N)]
-    g   = ROOT.TGraph(N, array('d',xs), array('d',ys) )
-    gUp = ROOT.TGraph(N, array('d',xs), array('d',us) )
-    gDn = ROOT.TGraph(N, array('d',xs), array('d',ds) )
-    return g, gUp, gDn
 
 # first do the mZD0p03 scan, with 100% BR to electrons
 # plotting all cuts
@@ -690,154 +511,4 @@ for combName in combinations:
                     labs=['Electron','Muon','Combined'],rangex=(0.03,3), pdir=args.plotDir)
     plotSensitivity('scan_mzd_'+combName+'_mz30MeV', [gElUnc, gMuUnc, gCombUnc], xIsMND=False,
                     labs=['Electron','Muon','Combined'],rangex=(0.03,3), pdir=args.plotDir)
-
-exit(0)
-# gs = [gsets['mNDratio3']['{}_{}_reach_{}'.format(cut, hnameNom, xvar)] for cut in ['cuts1','cuts5']]
-# plotSensitivity('scan_mnd_mz30MeV' gs, xIsMND=True )
-
-# for scanName in ['mZD0p03', 'mND10', 'mNDratio3']:
-#     xvar = 'nd' if scanName=='mZD0p03' else 'zd'
-#         gEl = gsets[scanName]['{}_{}_reach_{}'.format(cutEl, hnameNom, xvar)]
-#         gMu = gsets[scanName]['{}_{}_reach_{}'.format(cutMu, hnameNom, xvar)]
-
-#goodname='cuts_meeS_logx2_reach_zd'
-gs = [ gsets['mZD0p03'][x] for x in gsets['mZD0p03'] if 'cuts3' in x ]
-for g in gs: print(g.GetName())
-gs=[gsets['mZD0p03']['cuts3_meeS_logx2_reach_nd'], gsets['mZD0p03']['cuts3_meeS_logx2_reach_nd']]
-plotSensitivity( gs, xIsMND=True )
-
-gs = [ gsets['mND10'][x] for x in gsets['mND10'] if 'cuts3' in x]
-for g in gs: print(g.GetName())
-gEl, gMu = ApplyBR(gs[0]), ApplyBR(gs[0], False)
-plotSensitivity( gs+[gEl,gMu], xIsMND=False )
-
-gs = [ gsets['mNDratio3'][x] for x in gsets['mNDratio3'] if 'cuts3' in x]
-for g in gs: print(g.GetName())
-gEl = ApplyBR(gs[0], debug=0)
-gMu = ApplyBR(gs[0], False, debug=0)
-gComb = CombSig(gEl,gMu)
-gs = gs + [gEl,gMu,gComb]
-plotSensitivity( gs, xIsMND=False, sfx='_ratio' )
-
-exit(0)
-
-
-
-
-# def text2graph(fname, delimiter=' '):
-#     import numpy as np
-#     constraints = np.genfromtxt(fname,delimiter=delimiter)
-#     xvals, yvals = array('d',list(constraints[:,0])),array('d',list(constraints[:,1])) # probles with np
-#     return  ROOT.TGraph(len(xvals), xvals, yvals)
-# # gSig1 = text2graph('external_lines/sig1.txt', delimiter=',')
-# #     gSig3 = text2graph('external_lines/sig3.txt', delimiter=',')
-# #     gSig5 = text2graph('external_lines/sig5.txt', delimiter=',')
-
-# def plotSensitivityND(gs):
-#     c = ROOT.TCanvas()
-#     c.SetLogy()
-#     c.SetLogx()
-#     mg = ROOT.TMultiGraph()
-#     gConst = text2graph('external_lines/const_mnd.txt')
-    
-#     # pts=[]
-#     # for nSig in [1,3,5]:
-#     #     with open('external_lines/sig{}.txt'.format(nSig)) as f:
-#     #         for l in f:
-#     #             if ',' in l:
-#     #                 x, y = list(map(float,l.split(',')))
-#     #                 pts.append( (x, y, nSig) )
-#     # xvals = array('d', [p[0] for p in pts])
-#     # yvals = array('d', [p[1] for p in pts])
-#     # zvals = array('d', [p[2] for p in pts])
-#     # gSig = ROOT.TGraph2D(len(xvals),xvals,yvals,zvals)
-#     # gSig.Draw("colz")
-#     # h = gSig.GetHistogram().Clone("cnt")
-#     # h.SetContour(1, array('d',[1,2,3,4,5]))
-#     # h.Draw("CONT3 same")
-#     gSig1 = text2graph('external_lines/sig1v2.txt', delimiter=',')
-#     gSig3 = text2graph('external_lines/sig3v2.txt', delimiter=',')
-#     gSig5 = text2graph('external_lines/sig5v2.txt', delimiter=',')
-#     # constraints = np.genfromtxt('external_lines/sig1.txt',delimiter=',')
-#     # xvals, yvals = array('d',list(constraints[:,0])),array('d',list(constraints[:,1])) # probles with np
-    
-#     # import numpy as np
-#     # constraints1 = np.genfromtxt('external_lines/sig1.txt', delimiter=',')
-#     # constraints3 = np.genfromtxt('external_lines/sig3.txt', delimiter=',')
-#     # constraints5 = np.genfromtxt('external_lines/sig5.txt', delimiter=',')
-    
-#     # xvals, yvals = array('d',list(constraints[:,0])),array('d',list(constraints[:,1])) # probles with np
-#     # return  ROOT.TGraph(len(xvals), xvals, yvals)
-
-#     # constraints = np.genfromtxt(fname,delimiter=' ')
-#     # xvals, yvals = array('d',list(constraints[:,0])),array('d',list(constraints[:,1])) # probles with np
-    
-#     # print(gSig1, gSig3, gSig5)
-#     # constraints = np.genfromtxt('external_lines/const_mnd.txt',delimiter=' ')
-#     # xvals, yvals = array('d',list(constraints[:,0])),array('d',list(constraints[:,1])) # probles with np
-#     # gConst = ROOT.TGraph(len(xvals), xvals, yvals)
-#     # gConst = ROOT.TGraph(constraints.shape[0], 1e3*constraints[:,0], constraints[:,1])
-#     gConst.SetLineWidth(2); gConst.SetLineColor(ROOT.kBlack)
-#     mg.Add(gConst)
-#     for g in gs: mg.Add(g)
-#     mg.SetTitle(";m(N_{D}) [GeV]; |U_{#mu 4}|^{2}")
-#     mg.Draw("ALP")
-    
-#     for g in [gSig1,gSig3,gSig5]:
-#         g.SetMarkerColor(ROOT.kRed)
-#         g.SetFillColor(ROOT.kRed)
-#         g.Draw("FP same")
-        
-#     # mg.GetHistogram().GetXaxis().SetRangeUser(10,10e3)
-#     c.SaveAs('test.pdf')
-    
-# plotSensitivityND( [])
-# exit(0)
-
-
-# no longer used
-exit(0) 
-
-### Produce the chi2 limits directly from the yield plots
-from fitSignal import getMuSigInterval
-gsets['mZD0p03_chi2'] = {}
-gsets['mND10_chi2'] = {}
-hname='meeS_logx1' # histogram for signal extraction
-
-for cutname in cuts:
-    nSigmaTarget=2 #TODO pass to chi2 interval fn (make configurable)
-    b = h[('bTotal',cutname,hname)]
-    for scanName, sigSamples in [('mZD0p03',samples_mZD0p03),('mND10',samples_mND10)]:
-        xvals, yvals = [], []
-        for samp in sigSamples:
-            _srb = h[('srb',samp.name,cutname,hname)]
-            mZd, mNd = samp.masses
-            if args.debugFits:
-                debugName = "{}/debug/{}_{}_{}_{}".format(pdir,cutname,hname,scanName,samp.name)
-                os.system('mkdir -p '+pdir+'/debug')
-            else:
-                debugName = ''
-            if not ('dPhi_meeS_logx1_mND10_mZD0p3_mND10' in debugName): debugName=''
-            # make a nominal 'pseudodataset' w/ correct stat errors
-            pseudoData = b.Clone("pseudo")
-            for i in range(b.GetNbinsX()+2): pseudoData.SetBinError(i, sqrt(pseudoData.GetBinContent(i)))
-            sigStrengthExcl = getMuSigInterval(s, pseudoData, flatBkgSyst=args.flatBkgSyst, plotName=debugName)
-            maxReach = (sigStrengthExcl * refUm4*refUm4)
-            xvals.append(mZd if 'mND' in scanName else mNd)
-            yvals.append(maxReach)
-        g = ROOT.TGraph(len(xvals),array('d',xvals), array('d',yvals))
-        sortGraph(g)
-        g.SetName(cutname+'_'+hname+'_reach_'+('zd' if 'mND' in scanName else 'nd'))
-        gsets[scanName][g.GetName()] = g
-
-plotGraphs('chi2_reach_zd', [gsets['mND10'][x] for x in gsets['mND10']],
-           xtitle='m(Z_{d}) [MeV]', ytitle='|U_{#mu 4}|^{2}',
-           legcoors=(0.7,0.6,0.88,0.9),
-           xlims=None, ymin=eps2Min, ymax=eps2Max, legcols=1,
-           logy=True, logx=True, colz=None, styz=None, dopt='AL*', pdir=pdir)
-plotGraphs('chi2_reach_nd', [gsets['mZD0p03'][x] for x in gsets['mZD0p03']],
-           xtitle='m(N_{d}) [MeV]', ytitle='|U_{#mu 4}|^{2}',
-           legcoors=(0.7,0.6,0.88,0.9),
-           xlims=None, ymin=eps2Min, ymax=eps2Max, legcols=1,
-           logy=True, logx=True, colz=None, styz=None, dopt='AL*', pdir=pdir)
 
