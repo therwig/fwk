@@ -3,8 +3,11 @@ import ROOT
 from commonRootTools.plotUtils import plot
 
 samples=['GluGluToHHTo4B_node_cHHH'+s for s in ['0','1','2p45','5']]
-fs = {s:ROOT.TFile('data/'+s+'.skim.friend.root') for s in samples}
-ts = {s:fs[s].Get('Friends') for s in samples}
+fs = {s:ROOT.TFile('data/'+s+'.skim.root') for s in samples}
+ts = {s:fs[s].Get('Events') for s in samples}
+for sample in ts:
+    main_tree = ts[sample]
+    main_tree.AddFriend('Friends','data/'+sample+'.skim.friend.root')
 
 c = ROOT.TCanvas()
 
@@ -25,12 +28,23 @@ for s in samples:
     ts[s].Draw('mhh>>'+s+'_mhh','JetIdx[0]>-1') # fill
     h.Scale(1./h.Integral()) # normalize
     histoDict[s+'_mhh'] = h # save in a dictionary for later access
+    
+    h  = ROOT.TH1F(s+'_nJet',';n_{Jet}',16,-0.5,15.5) # construct
+    ts[s].Draw('nGenJet>>'+s+'_nJet','JetIdx[0]>-1') # fill
+    h.Scale(1./h.Integral()) # normalize
+    histoDict[s+'_nJet'] = h # save in a dictionary for later access
 
 hists  = [histoDict[s+'_mhh'] for s in samples]
 labels = [s.split('_')[-1] for s in samples]
 
 plot('test2',
      hists,
+     labs=labels,
+     colz=[ROOT.kBlack,ROOT.kBlue,ROOT.kRed,ROOT.kGreen],
+     ytitle='event fraction', dopt='hist'
+     )
+plot('test_nJet',
+     [histoDict[s+'_nJet'] for s in samples],
      labs=labels,
      colz=[ROOT.kBlack,ROOT.kBlue,ROOT.kRed,ROOT.kGreen],
      ytitle='event fraction', dopt='hist'

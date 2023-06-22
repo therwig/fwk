@@ -107,12 +107,30 @@ RVecI PickJets(RVecF pt, RVecF eta, RVecF phi, RVecF e){
 # }
 # """)
 
+ROOT.gInterpreter.Declare("""
+using namespace ROOT;
+float DoMatch(RVecF jeta, RVecF jphi, RVecF beta, RVecF bphi, RVecI genPartMotherIdxs, RVecI genPartPdgIds){
+  for(int i=0; i<jeta.size(); i++){
+    for(int j=0; j<beta.size(); j++){
+      
+    }
+  }
+  # //for(auto & j in jeta)
+  # // return 1;
+
+}
+""")
+
+
 #df = df.Define('GoodJets','GenJet_eta<2.5 && GenJet_eta>-2.5 && GenJet_hadronFlavour==5').Filter('Sum(GoodJets)>=4')
 df = df.Define('GoodJets','GenJet_hadronFlavour==5') #.Filter('Sum(GoodJets)>=4')
 df = df.Define('JetIdx','PickJets(GenJet_pt[GoodJets], GenJet_eta[GoodJets], GenJet_phi[GoodJets], GenJet_mass[GoodJets])')
 df = df.Define('mh1','GetDijetMass(JetIdx[0],JetIdx[1],GenJet_pt[GoodJets], GenJet_eta[GoodJets], GenJet_phi[GoodJets], GenJet_mass[GoodJets])')
 df = df.Define('mh2','GetDijetMass(JetIdx[2],JetIdx[3],GenJet_pt[GoodJets], GenJet_eta[GoodJets], GenJet_phi[GoodJets], GenJet_mass[GoodJets])')
 df = df.Define('mhh','GetMHH(JetIdx, GenJet_pt[GoodJets], GenJet_eta[GoodJets], GenJet_phi[GoodJets], GenJet_mass[GoodJets])')
+df = df.Define('truthBQ','abs(GenPart_pdgId)==5') #.Filter('Sum(GoodJets)>=4')
+df = df.Define('matchResult','DoMatch(GenJet_eta[GoodJets], GenJet_phi[GoodJets], GenPart_eta[truthBQ],GenPart_phi[truthBQ], GenPart_genPartIdxMother, GenPart_pdgId)')
+
 newColumns = list(map(str,df.GetColumnNames()))
 for c in allColumns: newColumns.remove(c)
 
