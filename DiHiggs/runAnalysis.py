@@ -25,7 +25,7 @@ itree = InputTree(itree)
 myAna = myAnalysis()
 (nall, npass, timeLoop) = eventLoop(inputFile=ifile, outputFile=ofile, inputTree=itree, wrappedOutputTree=otree,
                                     modules=[ myAna ], progress=(100000, sys.stdout), #filterOutput=0,
-                                    # maxEvents=100, #args.maxEvents, # optionally truncate large background sample
+                                    #maxEvents=10, #args.maxEvents, # optionally truncate large background sample
                                     )
 
 if otree:
